@@ -1580,5 +1580,40 @@
     ],
     "source": "https://ricette.giallozafferano.it/Spaghetti-Cacio-e-Pepe.html",
     "status": "quasi completo"
-  }
+  },
+  {
+"id": 50,
+"title": "Torta Wow",
+"category": "Dolci",
+"image": "images/torta-wow.jpg",
+"prep_time": "20 min",
+"cook_time": "",
+"rest_time": "2 ore in frigo",
+"total_time": "2 h 20 min circa",
+"servings": "Stampo da 24 cm",
+"difficulty": "Molto facile",
+"ingredients": [
+"200 g biscotti secchi",
+"90 g burro",
+"15 g acqua",
+"700 g pere sbucciate e tagliate a pezzi",
+"250 g cioccolato fondente fuso",
+"1 cucchiaino colmo di cannella (facoltativo)",
+"qualche nocciola intera (decorazione facoltativa)",
+"100 g circa di zucchero per caramello"
+],
+"steps": [
+"Trita i biscotti secchi e mescolali con burro fuso e acqua fino a ottenere un composto sabbioso.",
+"Distribuisci il composto nello stampo da 24 cm e pressalo bene per formare la base.",
+"Cuoci le pere in padella finché diventano morbide; se non sono molto mature aggiungi un pizzico di zucchero.",
+"Frulla le pere fino a ottenere una crema liscia.",
+"Unisci il cioccolato fondente fuso e la cannella e mescola bene.",
+"Versa il composto sopra la base di biscotti e livella.",
+"Lascia raffreddare completamente e fai rassodare in frigorifero.",
+"Per decorare prepara un caramello con lo zucchero, lascialo intiepidire leggermente e intingi le nocciole.",
+"Infilza le nocciole caramellate su stuzzicadenti e lasciale indurire completamente prima di decorare la torta."
+],
+"source": "https://www.davidezambelli.com/",
+"status": "completo"
+}
 ]
