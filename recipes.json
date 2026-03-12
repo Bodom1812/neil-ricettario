@@ -1,5 +1,31 @@
 [
   {
+  "title": "Pane toscano",
+  "category": "Pane e lievitati",
+  "prep_time": "10 minuti",
+  "cook_time": "35 minuti",
+  "rest_time": "3-4 ore",
+  "total_time": "5 ore",
+  "servings": "1a pagnotta grande",
+  "difficulty": "Molto facile",
+  "ingredients": [
+    "500 grammi di farina",
+    "13 grammi di lievito di birra",
+    "280 ml di acqua",
+    "1 cucchiaino di zucchero per attivare il lievito",
+    "1 cucchiaino di sale",
+    "1 cucchiaio di olio"
+  ],
+  "steps": [
+    "Impasta tutti gli ingredienti",
+    "Lascia risposare 4 ore",
+    "Accendi il forno a 200 gradi",
+    "Lascialo lì 35 minuti"
+  ],
+  "source": "",
+  "image": "images/pane-toscano.jpg"
+},
+  {
     "id": 1,
     "title": "Madeleine",
     "category": "Dolci",
