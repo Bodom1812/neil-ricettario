@@ -1,36 +1,75 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Ricettario di Neil</title>
-
-<link rel="stylesheet" href="style.css">
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#5b8cff" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Ricettario Neil" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Le ricette (rubate) di Neil</title>
 </head>
-
 <body>
+  <div class="app">
+    <section class="hero">
+      <div class="hero-banner">
+        <img src="banner.png" alt="Banner Le ricette (rubate) di Neil" class="hero-banner-image">
+        <div class="hero-banner-overlay"></div>
+        <div class="hero-banner-title-wrap">
+          <h1>Le ricette (rubate) di Neil</h1>
+        </div>
+      </div>
 
-<header class="header">
-<h1>Ricettario di Neil</h1>
+      <div class="hero-grid">
+        <div class="glass">
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input id="search" class="search" placeholder="Cerca una ricetta o un ingrediente..." />
+          </div>
 
-<input
-type="text"
-id="search"
-placeholder="Cerca una ricetta..."
->
-</header>
+          <div class="quick-row">
+            <div id="quickFilters" class="quick-filters"></div>
+          </div>
 
-<main>
+          <div class="row">
+            <select id="category"><option value="Tutte">Tutte le categorie</option></select>
+            <button id="favToggle" class="toggle">Solo preferiti</button>
+            <button id="installBtn" class="primary">Installa app</button>
+          </div>
+          <div id="chips" class="chips"></div>
+        </div>
 
-<div id="filters"></div>
+        <div class="stats-wrap">
+          <div class="stats">
+            <div class="stat"><strong id="resultsCount">0</strong><span>risultati</span></div>
+            <div class="stat"><strong id="allCount">0</strong><span>ricette</span></div>
+            <div class="stat"><strong id="favCount">0</strong><span>preferiti</span></div>
+            <div class="stat"><strong id="noteCount">0</strong><span>note</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-<div id="recipes"></div>
+    <div class="toolbar">
+      <h2 id="sectionTitle">Archivio ricette</h2>
+      <div class="meta" id="activeInfo">Archivio completo</div>
+    </div>
 
-</main>
+    <main id="grid" class="grid"></main>
+  </div>
 
-<script src="app.js?v=6"></script>
+  <button id="topBtn" class="top-btn" aria-label="Torna su">↑</button>
 
+  <nav class="bottom-nav">
+    <button id="navAll" class="nav-btn active">Tutte</button>
+    <button id="navFav" class="nav-btn">Preferiti</button>
+    <button id="navNotes" class="nav-btn">Con note</button>
+    <button id="navRecent" class="nav-btn">Recenti</button>
+  </nav>
+
+  <div id="toast" class="toast">Salvato</div>
+  <script src="app.js"></script>
 </body>
 </html>
