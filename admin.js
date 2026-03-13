@@ -1,3 +1,6 @@
+let currentSession = null;
+let editingRecipeId = null;
+
 async function requireAuth() {
   const { data, error } = await window.supabaseClient.auth.getSession();
 
@@ -18,6 +21,8 @@ async function requireAuth() {
 async function initAuthUi() {
   const session = await requireAuth();
   if (!session) return null;
+
+  currentSession = session;
 
   const sessionInfo = document.getElementById('sessionInfo');
   const logoutBtn = document.getElementById('logoutBtn');
@@ -60,7 +65,9 @@ const fields = {
   steps: $('steps'),
   output: $('output'),
   preview: $('preview'),
-  saveSupabase: $('saveSupabase')
+  saveSupabase: $('saveSupabase'),
+  refreshRecipes: $('refreshRecipes'),
+  adminRecipesList: $('adminRecipesList')
 };
 
 function normalizeImagePath(value) {
@@ -101,7 +108,9 @@ function validate(recipe) {
   if (!recipe.category) return 'Inserisci la categoria.';
   if (!recipe.ingredients.length) return 'Inserisci almeno un ingrediente.';
   if (!recipe.steps.length) return 'Inserisci almeno un passaggio.';
-  if (!recipe.image_url && !fields.imageFile.files.length) return 'Carica un’immagine oppure inserisci un URL/percorso immagine.';
+  if (!recipe.image_url && !fields.imageFile.files.length && !editingRecipeId) {
+    return 'Carica un’immagine oppure inserisci un URL/percorso immagine.';
+  }
   return '';
 }
 
@@ -118,6 +127,7 @@ function renderPreview(recipe) {
       ${recipe.servings ? `<span class="tag">${recipe.servings}</span>` : ''}
       ${recipe.difficulty ? `<span class="tag">${recipe.difficulty}</span>` : ''}
       ${recipe.status ? `<span class="tag">${recipe.status}</span>` : ''}
+      ${editingRecipeId ? `<span class="tag">modifica</span>` : `<span class="tag">nuova</span>`}
     </div>
     <strong>Ingredienti</strong>
     <ul class="preview-list">
@@ -193,9 +203,13 @@ async function saveToSupabase() {
 
   try {
     btn.disabled = true;
-    btn.textContent = 'Salvataggio...';
+    btn.textContent = editingRecipeId ? 'Aggiornamento...' : 'Salvataggio...';
 
-    const imageUrl = await uploadImageIfNeeded();
+    let imageUrl = recipe.image_url;
+
+    if (fields.imageFile.files[0]) {
+      imageUrl = await uploadImageIfNeeded();
+    }
 
     const payload = {
       title: recipe.title,
@@ -214,26 +228,169 @@ async function saveToSupabase() {
       created_by: session.user.id
     };
 
-    const { error } = await window.supabaseClient
-      .from('recipes')
-      .insert([payload]);
+    let result;
 
-    if (error) {
-      throw new Error('Salvataggio ricetta fallito: ' + error.message);
+    if (editingRecipeId) {
+      result = await window.supabaseClient
+        .from('recipes')
+        .update(payload)
+        .eq('id', editingRecipeId);
+    } else {
+      result = await window.supabaseClient
+        .from('recipes')
+        .insert([payload]);
+    }
+
+    if (result.error) {
+      throw new Error((editingRecipeId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') + result.error.message);
     }
 
     fields.image.value = imageUrl;
     fields.output.value = JSON.stringify(payload, null, 2);
     renderPreview(payload);
 
-    alert('Ricetta salvata su Supabase con successo.');
+    alert(editingRecipeId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
+
+    clearForm(false);
+    await loadAdminRecipes();
   } catch (err) {
     console.error(err);
     alert(err.message || 'Errore durante il salvataggio.');
   } finally {
     btn.disabled = false;
-    btn.textContent = originalText;
+    updateSaveButton();
   }
+}
+
+function updateSaveButton() {
+  fields.saveSupabase.textContent = editingRecipeId ? 'Aggiorna ricetta' : 'Salva su Supabase';
+}
+
+function clearForm(resetOutput = true) {
+  [
+    fields.title, fields.prep, fields.cook, fields.rest, fields.total,
+    fields.servings, fields.source, fields.image, fields.ingredients, fields.steps
+  ].forEach(el => el.value = '');
+
+  if (fields.imageFile) fields.imageFile.value = '';
+  fields.category.selectedIndex = 0;
+  fields.difficulty.selectedIndex = 0;
+
+  if (resetOutput) fields.output.value = '';
+
+  fields.preview.className = 'preview-card empty';
+  fields.preview.textContent = 'Compila il form per vedere l’anteprima.';
+
+  editingRecipeId = null;
+  updateSaveButton();
+}
+
+function fillFormForEdit(recipe) {
+  editingRecipeId = recipe.id || null;
+
+  fields.title.value = recipe.title || '';
+  fields.category.value = recipe.category || 'Dolci';
+  fields.prep.value = recipe.prep_time || '';
+  fields.cook.value = recipe.cook_time || '';
+  fields.rest.value = recipe.rest_time || '';
+  fields.total.value = recipe.total_time || '';
+  fields.servings.value = recipe.servings || '';
+  fields.difficulty.value = recipe.difficulty || 'Molto facile';
+  fields.source.value = recipe.source || '';
+  fields.image.value = recipe.image_url || recipe.image || '';
+  fields.ingredients.value = (recipe.ingredients || []).join('\n');
+  fields.steps.value = (recipe.steps || []).join('\n');
+
+  if (fields.imageFile) fields.imageFile.value = '';
+
+  updateSaveButton();
+  generate();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteRecipe(recipeId, recipeTitle) {
+  const confirmDelete = confirm(`Vuoi davvero eliminare la ricetta "${recipeTitle}"?`);
+  if (!confirmDelete) return;
+
+  try {
+    const { error } = await window.supabaseClient
+      .from('recipes')
+      .delete()
+      .eq('id', recipeId);
+
+    if (error) {
+      throw new Error('Eliminazione fallita: ' + error.message);
+    }
+
+    if (editingRecipeId === recipeId) {
+      clearForm();
+    }
+
+    alert('Ricetta eliminata.');
+    await loadAdminRecipes();
+  } catch (err) {
+    console.error(err);
+    alert(err.message || 'Errore durante l’eliminazione.');
+  }
+}
+
+function recipeRowMarkup(recipe) {
+  const imageSrc = recipe.image_url || recipe.image || '';
+  return `
+    <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
+      <img src="${imageSrc}" alt="${recipe.title}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
+      <div style="min-width:0;">
+        <h3 style="margin:0 0 6px;font-size:18px;">${recipe.title}</h3>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5;">
+          <div><strong>Categoria:</strong> ${recipe.category || '-'}</div>
+          <div><strong>Fonte:</strong> ${recipe.source || '-'}</div>
+          <div><strong>Status:</strong> ${recipe.status || '-'}</div>
+        </div>
+      </div>
+      <div style="display:grid;gap:8px;">
+        <button type="button" onclick="editRecipePublic('${recipe.id}')">Modifica</button>
+        <button type="button" onclick="deleteRecipePublic('${recipe.id}', ${JSON.stringify(recipe.title)})">Elimina</button>
+      </div>
+    </article>
+  `;
+}
+
+async function loadAdminRecipes() {
+  if (!fields.adminRecipesList) return;
+
+  fields.adminRecipesList.innerHTML = 'Caricamento ricette...';
+
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('recipes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    window.__adminRecipes = data || [];
+
+    if (!window.__adminRecipes.length) {
+      fields.adminRecipesList.innerHTML = '<div class="preview-card empty">Nessuna ricetta presente.</div>';
+      return;
+    }
+
+    fields.adminRecipesList.innerHTML = window.__adminRecipes.map(recipeRowMarkup).join('');
+  } catch (err) {
+    console.error(err);
+    fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${err.message}</div>`;
+  }
+}
+
+function editRecipeById(recipeId) {
+  const recipe = (window.__adminRecipes || []).find(r => r.id === recipeId);
+  if (!recipe) {
+    alert('Ricetta non trovata.');
+    return;
+  }
+  fillFormForEdit(recipe);
 }
 
 $('generate').addEventListener('click', generate);
@@ -254,21 +411,12 @@ $('copy').addEventListener('click', async () => {
 });
 
 $('clear').addEventListener('click', () => {
-  Object.values(fields).forEach(el => {
-    if (!el || el.tagName === 'SELECT' || el.id === 'output' || el.id === 'preview' || el.id === 'saveSupabase') return;
-    if (el.type === 'file') {
-      el.value = '';
-      return;
-    }
-    el.value = '';
-  });
-
-  fields.category.selectedIndex = 0;
-  fields.difficulty.selectedIndex = 0;
-  fields.output.value = '';
-  fields.preview.className = 'preview-card empty';
-  fields.preview.textContent = 'Compila il form per vedere l’anteprima.';
+  clearForm();
 });
+
+if (fields.refreshRecipes) {
+  fields.refreshRecipes.addEventListener('click', loadAdminRecipes);
+}
 
 [
   fields.title, fields.category, fields.prep, fields.cook, fields.rest, fields.total,
@@ -292,6 +440,11 @@ if (fields.imageFile) {
   });
 }
 
-initAuthUi().then(() => {
+window.editRecipePublic = editRecipeById;
+window.deleteRecipePublic = deleteRecipe;
+
+initAuthUi().then(async () => {
+  updateSaveButton();
   generate();
+  await loadAdminRecipes();
 });
