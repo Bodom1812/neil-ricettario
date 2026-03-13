@@ -79,10 +79,16 @@
         </label>
 
         <label class="full">
-          <span>Percorso immagine</span>
-          <input id="image" type="text" placeholder="images/lasagne-della-domenica.jpg" />
-          <small>Puoi scrivere anche solo il nome file, verrà trasformato in <code>images/...</code>.</small>
-        </label>
+  <span>Immagine ricetta</span>
+  <input id="imageFile" type="file" accept="image/*" />
+  <small>Carica un file immagine dal computer. L’upload andrà su Supabase Storage.</small>
+</label>
+
+<label class="full">
+  <span>Oppure URL/Percorso immagine manuale</span>
+  <input id="image" type="text" placeholder="https://... oppure images/lasagne.jpg" />
+  <small>Usa questo campo solo se non vuoi caricare un file.</small>
+</label>
 
         <label class="full">
           <span>Ingredienti (uno per riga)</span>
