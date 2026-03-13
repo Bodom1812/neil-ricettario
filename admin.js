@@ -1,3 +1,19 @@
+async function requireAuth() {
+  const { data, error } = await window.supabaseClient.auth.getSession();
+
+  if (error) {
+    console.error('Errore controllo sessione:', error.message);
+    window.location.href = 'login.html';
+    return;
+  }
+
+  if (!data.session) {
+    window.location.href = 'login.html';
+    return;
+  }
+}
+
+requireAuth();
 const $ = id => document.getElementById(id);
 
 const fields = {
