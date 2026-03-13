@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Import ricette</title>
+<style>
+body{
+  font-family:system-ui;
+  padding:40px;
+  background:#111;
+  color:white;
+}
+button{
+  padding:12px 18px;
+  font-size:16px;
+  cursor:pointer;
+}
+#log{
+  margin-top:20px;
+  white-space:pre-wrap;
+  font-family:monospace;
+}
+</style>
+</head>
+<body>
+
+<h1>Import ricette da recipes.json</h1>
+
+<button id="start">Avvia import</button>
+
+<div id="log"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+
+<script>
+
+const log = msg => {
+  document.getElementById("log").textContent += msg + "\n";
+}
+
+document.getElementById("start").onclick = async () => {
+
+  log("Carico recipes.json...");
+
+  const res = await fetch("./recipes.json");
+  const recipes = await res.json();
+
+  log("Ricette trovate: " + recipes.length);
+
+  for (let r of recipes){
+
+    const payload = {
+      title: r.title,
+      category: r.category,
+      image_url: r.image || "",
+      prep_time: r.prep_time || "",
+      cook_time: r.cook_time || "",
+      rest_time: r.rest_time || "",
+      total_time: r.total_time || "",
+      servings: r.servings || "",
+      difficulty: r.difficulty || "",
+      ingredients: r.ingredients || [],
+      steps: r.steps || [],
+      source: r.source || "",
+      status: "published"
+    };
+
+    const { error } = await window.supabaseClient
+      .from("recipes")
+      .insert([payload]);
+
+    if(error){
+      log("ERRORE: " + r.title);
+      log(error.message);
+    } else {
+      log("OK: " + r.title);
+    }
+
+  }
+
+  log("IMPORT COMPLETATO");
+
+};
+
+</script>
+
+</body>
+</html>
