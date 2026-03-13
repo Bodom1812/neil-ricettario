@@ -4,17 +4,43 @@ async function requireAuth() {
   if (error) {
     console.error('Errore controllo sessione:', error.message);
     window.location.href = 'login.html';
-    return;
+    return null;
   }
 
   if (!data.session) {
     window.location.href = 'login.html';
-    return;
+    return null;
+  }
+
+  return data.session;
+}
+
+async function initAuthUi() {
+  const session = await requireAuth();
+  if (!session) return;
+
+  const sessionInfo = document.getElementById('sessionInfo');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  if (sessionInfo) {
+    sessionInfo.textContent = `Accesso effettuato come: ${session.user.email}`;
+  }
+
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      const { error } = await window.supabaseClient.auth.signOut();
+
+      if (error) {
+        alert('Errore durante il logout: ' + error.message);
+        return;
+      }
+
+      window.location.href = 'login.html';
+    });
   }
 }
 
-requireAuth();
-const $ = id => document.getElementById(id);
+initAuthUi();
 
 const fields = {
   title: $('title'),
