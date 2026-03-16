@@ -355,7 +355,7 @@ installBtn.addEventListener("click",async()=>{
   installBtn.style.display="none";
 });
 
-async function boot(){
+async function boot() {
   let recipes = [];
 
   try {
@@ -363,12 +363,12 @@ async function boot(){
       .from('recipes')
       .select('*')
       .eq('status', 'published')
-      .order('created_at', { ascending: false });
+      .order('title', { ascending: true });
 
     if (error) throw error;
 
     if (data && data.length) {
-      console.log('Ricette caricate da Supabase');
+      console.log('Ricette caricate da Supabase:', data.length);
       recipes = data;
     } else {
       console.log('Nessuna ricetta pubblicata su Supabase, uso recipes.json');
@@ -378,14 +378,31 @@ async function boot(){
   }
 
   if (!recipes.length) {
-    const res = await fetch('./recipes.json');
-    recipes = await res.json();
+    try {
+      const res = await fetch('./recipes.json');
+
+      if (!res.ok) {
+        throw new Error(`Errore fetch recipes.json: ${res.status}`);
+      }
+
+      recipes = await res.json();
+      console.log('Ricette caricate da recipes.json:', recipes.length);
+    } catch (jsonErr) {
+      console.error('Impossibile caricare anche recipes.json', jsonErr);
+      recipes = [];
+    }
   }
 
   state.recipes = recipes.map(r => ({
     ...r,
     image_url: r.image_url || r.image || "",
-    _haystack: [r.title, r.category, r.source, ...(r.ingredients||[]), ...(r.steps||[])].join(" ").toLowerCase()
+    _haystack: [
+      r.title,
+      r.category,
+      r.source,
+      ...(r.ingredients || []),
+      ...(r.steps || [])
+    ].join(" ").toLowerCase()
   }));
 
   render();
