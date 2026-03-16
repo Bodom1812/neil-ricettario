@@ -37,7 +37,7 @@ function getRecipeKey(r){
 
 function getRecipePageUrl(recipe){
   if(!recipe?.slug) return "";
-  return `recipe.html?slug=${encodeURIComponent(recipe.slug)}`;
+  return `/recipe/${encodeURIComponent(recipe.slug)}`;
 }
 
 function isFav(key){return getFavs().includes(key);}
@@ -260,7 +260,7 @@ function card(r){
         ? `<button onclick="openRecipePublic('${encodeURIComponent(r.source)}','${encodeURIComponent(recipeKey)}')">Apri fonte</button>`
         : `<button disabled>Nessuna fonte</button>`}
       ${recipeUrl
-        ? `<button onclick="copyLinkPublic('${encodeURIComponent(new URL(recipeUrl, window.location.href).href)}')">Copia link</button>`
+        ? `<button onclick="copyLinkPublic('${encodeURIComponent(new URL(recipeUrl, window.location.origin).href)}')">Copia link</button>`
         : `<button disabled>Copia link</button>`}
       <button onclick="toggleNotePublic('${encodeURIComponent(recipeKey)}')">${note.trim()?'Modifica nota':'Aggiungi nota'}</button>
     </div>
