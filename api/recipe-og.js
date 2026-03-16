@@ -1,3 +1,5 @@
+const DEFAULT_RECIPE_IMAGE = "/images/Chef Lai.png";
+
 export default async function handler(req, res) {
   try {
     const { slug } = req.query || {};
@@ -36,10 +38,13 @@ export default async function handler(req, res) {
     const title = safeText(recipe.title || "Ricetta");
     const description =
       extractDescription(recipe) || buildDescriptionFromTitle(title);
-    const imageUrl = safeUrl(
-      recipe.image_url || `${SITE_URL}/icons/icon-512.png`,
-      SITE_URL
-    );
+
+    const imageSource =
+      recipe.image_url && String(recipe.image_url).trim()
+        ? recipe.image_url
+        : DEFAULT_RECIPE_IMAGE;
+
+    const imageUrl = safeUrl(imageSource, SITE_URL);
     const canonicalUrl = `${SITE_URL}/recipe/${encodeURIComponent(slug)}`;
 
     const ingredients = normalizeList(recipe.ingredients);
@@ -529,7 +534,7 @@ function safeText(value) {
 function safeUrl(value, siteUrl) {
   const raw = String(value || "").trim();
 
-  if (!raw) return `${siteUrl}/icons/icon-512.png`;
+  if (!raw) return `${siteUrl}${DEFAULT_RECIPE_IMAGE}`;
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith("/")) return `${siteUrl}${raw}`;
 
