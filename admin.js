@@ -1,6 +1,8 @@
+console.log('admin.js v20260316-3 caricato');
+
 let currentSession = null;
 let editingRecipeId = null;
-window.__adminRecipes = Array.isArray(window.__adminRecipes) ? window.__adminRecipes : [];
+window.__adminRecipes = [];
 
 async function requireAuth() {
   const { data, error } = await window.supabaseClient.auth.getSession();
@@ -48,7 +50,7 @@ async function initAuthUi() {
   return session;
 }
 
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 
 const fields = {
   title: $('title'),
@@ -68,7 +70,10 @@ const fields = {
   preview: $('preview'),
   saveSupabase: $('saveSupabase'),
   refreshRecipes: $('refreshRecipes'),
-  adminRecipesList: $('adminRecipesList')
+  adminRecipesList: $('adminRecipesList'),
+  generate: $('generate'),
+  copy: $('copy'),
+  clear: $('clear')
 };
 
 function escapeHtml(value) {
@@ -91,7 +96,7 @@ function normalizeImagePath(value) {
 function toLines(value) {
   return (value || '')
     .split('\n')
-    .map(v => v.trim())
+    .map((v) => v.trim())
     .filter(Boolean);
 }
 
@@ -120,7 +125,7 @@ function validate(recipe) {
   if (!recipe.steps.length) return 'Inserisci almeno un passaggio.';
 
   const existingRecipe = editingRecipeId
-    ? (window.__adminRecipes || []).find(r => r.id === editingRecipeId)
+    ? (window.__adminRecipes || []).find((r) => r.id === editingRecipeId)
     : null;
 
   const hasExistingImage = !!(existingRecipe && (existingRecipe.image_url || existingRecipe.image));
@@ -134,6 +139,7 @@ function validate(recipe) {
 
 function renderPreview(recipe) {
   const previewImage = recipe.image_url || '';
+
   fields.preview.classList.remove('empty');
   fields.preview.innerHTML = `
     <img class="preview-img" src="${escapeHtml(previewImage)}" alt="${escapeHtml(recipe.title || 'Anteprima')}" onerror="this.style.display='none'">
@@ -149,11 +155,11 @@ function renderPreview(recipe) {
     </div>
     <strong>Ingredienti</strong>
     <ul class="preview-list">
-      ${recipe.ingredients.slice(0, 6).map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+      ${recipe.ingredients.slice(0, 6).map((i) => `<li>${escapeHtml(i)}</li>`).join('')}
     </ul>
     <strong>Procedimento</strong>
     <ol class="preview-list">
-      ${recipe.steps.slice(0, 4).map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+      ${recipe.steps.slice(0, 4).map((i) => `<li>${escapeHtml(i)}</li>`).join('')}
     </ol>
   `;
 }
@@ -164,7 +170,7 @@ function generate() {
 
   if (error) {
     fields.output.value = error;
-    fields.preview.classList.add('empty');
+    fields.preview.className = 'preview-card empty';
     fields.preview.textContent = error;
     return;
   }
@@ -175,6 +181,7 @@ function generate() {
 
 async function uploadImageIfNeeded() {
   const file = fields.imageFile.files[0];
+
   if (!file) {
     return normalizeImagePath(fields.image.value);
   }
@@ -210,9 +217,17 @@ function updateSaveButton() {
 
 function clearForm(resetOutput = true) {
   [
-    fields.title, fields.prep, fields.cook, fields.rest, fields.total,
-    fields.servings, fields.source, fields.image, fields.ingredients, fields.steps
-  ].forEach(el => {
+    fields.title,
+    fields.prep,
+    fields.cook,
+    fields.rest,
+    fields.total,
+    fields.servings,
+    fields.source,
+    fields.image,
+    fields.ingredients,
+    fields.steps
+  ].forEach((el) => {
     if (el) el.value = '';
   });
 
@@ -220,7 +235,9 @@ function clearForm(resetOutput = true) {
   if (fields.category) fields.category.selectedIndex = 0;
   if (fields.difficulty) fields.difficulty.selectedIndex = 0;
 
-  if (resetOutput && fields.output) fields.output.value = '';
+  if (resetOutput && fields.output) {
+    fields.output.value = '';
+  }
 
   if (fields.preview) {
     fields.preview.className = 'preview-card empty';
@@ -253,7 +270,7 @@ function fillFormForEdit(recipe) {
   generate();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  console.log('Modalità modifica attiva. ID ricetta:', editingRecipeId);
+  console.log('Modifica ricetta ID:', editingRecipeId);
 }
 
 function recipeRowMarkup(recipe) {
@@ -261,7 +278,12 @@ function recipeRowMarkup(recipe) {
 
   return `
     <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
-      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(recipe.title || '')}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
+      <img
+        src="${escapeHtml(imageSrc)}"
+        alt="${escapeHtml(recipe.title || '')}"
+        style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;"
+        onerror="this.style.display='none'"
+      >
       <div style="min-width:0;">
         <h3 style="margin:0 0 6px;font-size:18px;">${escapeHtml(recipe.title || '')}</h3>
         <div style="font-size:13px;color:var(--muted);line-height:1.5;">
@@ -271,8 +293,8 @@ function recipeRowMarkup(recipe) {
         </div>
       </div>
       <div style="display:grid;gap:8px;">
-        <button type="button" onclick="editRecipePublic('${recipe.id}')">Modifica</button>
-        <button type="button" onclick="deleteRecipePublic('${recipe.id}', ${JSON.stringify(recipe.title || '')})">Elimina</button>
+        <button type="button" data-action="edit" data-id="${escapeHtml(recipe.id)}">Modifica</button>
+        <button type="button" data-action="delete" data-id="${escapeHtml(recipe.id)}">Elimina</button>
       </div>
     </article>
   `;
@@ -294,7 +316,9 @@ function renderAdminRecipesList(recipes) {
     return;
   }
 
-  fields.adminRecipesList.innerHTML = sortRecipesForAdmin(recipes).map(recipeRowMarkup).join('');
+  fields.adminRecipesList.innerHTML = sortRecipesForAdmin(recipes)
+    .map(recipeRowMarkup)
+    .join('');
 }
 
 async function loadAdminRecipes() {
@@ -314,7 +338,8 @@ async function loadAdminRecipes() {
 
     window.__adminRecipes = Array.isArray(data) ? data : [];
     renderAdminRecipesList(window.__adminRecipes);
-    console.log('Ricette admin caricate:', window.__adminRecipes.length);
+
+    console.log('Ricette caricate:', window.__adminRecipes.length, window.__adminRecipes);
   } catch (err) {
     console.error('Errore loadAdminRecipes:', err);
     fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${escapeHtml(err.message)}</div>`;
@@ -345,7 +370,7 @@ async function saveToSupabase() {
     if (fields.imageFile.files[0]) {
       imageUrl = await uploadImageIfNeeded();
     } else if (originalEditingId) {
-      const existingRecipe = (window.__adminRecipes || []).find(r => r.id === originalEditingId);
+      const existingRecipe = (window.__adminRecipes || []).find((r) => r.id === originalEditingId);
       if (!imageUrl && existingRecipe?.image_url) {
         imageUrl = existingRecipe.image_url;
       }
@@ -409,7 +434,10 @@ async function saveToSupabase() {
   }
 }
 
-async function deleteRecipe(recipeId, recipeTitle) {
+async function deleteRecipe(recipeId) {
+  const recipe = (window.__adminRecipes || []).find((r) => r.id === recipeId);
+  const recipeTitle = recipe?.title || 'questa ricetta';
+
   const session = await requireAuth();
   if (!session) return;
 
@@ -417,6 +445,8 @@ async function deleteRecipe(recipeId, recipeTitle) {
   if (!confirmDelete) return;
 
   try {
+    console.log('Tentativo eliminazione ricetta ID:', recipeId);
+
     const { data, error } = await window.supabaseClient
       .from('recipes')
       .delete()
@@ -444,7 +474,7 @@ async function deleteRecipe(recipeId, recipeTitle) {
 }
 
 function editRecipeById(recipeId) {
-  const recipe = (window.__adminRecipes || []).find(r => r.id === recipeId);
+  const recipe = (window.__adminRecipes || []).find((r) => r.id === recipeId);
 
   if (!recipe) {
     alert('Ricetta non trovata.');
@@ -454,76 +484,108 @@ function editRecipeById(recipeId) {
   fillFormForEdit(recipe);
 }
 
-$('generate').addEventListener('click', generate);
-$('saveSupabase').addEventListener('click', saveToSupabase);
-
-$('copy').addEventListener('click', async () => {
-  if (!fields.output.value.trim()) generate();
-  if (!fields.output.value.trim()) return;
-
-  try {
-    await navigator.clipboard.writeText(fields.output.value);
-    $('copy').textContent = 'Copiato';
-    setTimeout(() => {
-      $('copy').textContent = 'Copia JSON';
-    }, 1200);
-  } catch {
-    $('copy').textContent = 'Copia fallita';
-    setTimeout(() => {
-      $('copy').textContent = 'Copia JSON';
-    }, 1200);
+function bindStaticEvents() {
+  if (fields.generate) {
+    fields.generate.addEventListener('click', generate);
   }
-});
 
-$('clear').addEventListener('click', () => {
-  clearForm();
-});
-
-if (fields.refreshRecipes) {
-  fields.refreshRecipes.addEventListener('click', loadAdminRecipes);
-}
-
-[
-  fields.title,
-  fields.category,
-  fields.prep,
-  fields.cook,
-  fields.rest,
-  fields.total,
-  fields.servings,
-  fields.difficulty,
-  fields.source,
-  fields.image,
-  fields.ingredients,
-  fields.steps
-].forEach(el => {
-  if (el) {
-    el.addEventListener('input', generate);
+  if (fields.saveSupabase) {
+    fields.saveSupabase.addEventListener('click', saveToSupabase);
   }
-});
 
-if (fields.imageFile) {
-  fields.imageFile.addEventListener('change', () => {
-    const file = fields.imageFile.files[0];
+  if (fields.copy) {
+    fields.copy.addEventListener('click', async () => {
+      if (!fields.output.value.trim()) generate();
+      if (!fields.output.value.trim()) return;
 
-    if (file) {
-      fields.image.value = '';
-      fields.preview.classList.remove('empty');
-      fields.preview.innerHTML = `
-        <img class="preview-img" src="${URL.createObjectURL(file)}" alt="Anteprima immagine">
-        <h3>${escapeHtml(fields.title.value.trim() || 'Titolo ricetta')}</h3>
-        <p>Immagine selezionata: ${escapeHtml(file.name)}</p>
-      `;
-    } else {
-      generate();
+      try {
+        await navigator.clipboard.writeText(fields.output.value);
+        fields.copy.textContent = 'Copiato';
+        setTimeout(() => {
+          fields.copy.textContent = 'Copia JSON';
+        }, 1200);
+      } catch {
+        fields.copy.textContent = 'Copia fallita';
+        setTimeout(() => {
+          fields.copy.textContent = 'Copia JSON';
+        }, 1200);
+      }
+    });
+  }
+
+  if (fields.clear) {
+    fields.clear.addEventListener('click', () => {
+      clearForm();
+    });
+  }
+
+  if (fields.refreshRecipes) {
+    fields.refreshRecipes.addEventListener('click', loadAdminRecipes);
+  }
+
+  [
+    fields.title,
+    fields.category,
+    fields.prep,
+    fields.cook,
+    fields.rest,
+    fields.total,
+    fields.servings,
+    fields.difficulty,
+    fields.source,
+    fields.image,
+    fields.ingredients,
+    fields.steps
+  ].forEach((el) => {
+    if (el) {
+      el.addEventListener('input', generate);
     }
   });
+
+  if (fields.imageFile) {
+    fields.imageFile.addEventListener('change', () => {
+      const file = fields.imageFile.files[0];
+
+      if (file) {
+        fields.image.value = '';
+        fields.preview.classList.remove('empty');
+        fields.preview.innerHTML = `
+          <img class="preview-img" src="${URL.createObjectURL(file)}" alt="Anteprima immagine">
+          <h3>${escapeHtml(fields.title.value.trim() || 'Titolo ricetta')}</h3>
+          <p>Immagine selezionata: ${escapeHtml(file.name)}</p>
+        `;
+      } else {
+        generate();
+      }
+    });
+  }
+
+  if (fields.adminRecipesList) {
+    fields.adminRecipesList.addEventListener('click', async (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+
+      const action = button.dataset.action;
+      const recipeId = button.dataset.id;
+
+      console.log('Click lista admin:', action, recipeId);
+
+      if (!recipeId) return;
+
+      if (action === 'edit') {
+        editRecipeById(recipeId);
+        return;
+      }
+
+      if (action === 'delete') {
+        await deleteRecipe(recipeId);
+      }
+    });
+  }
 }
 
-window.editRecipePublic = editRecipeById;
-window.deleteRecipePublic = deleteRecipe;
-
 initAuthUi().then(async () => {
+  bindStaticEvents();
   updateSaveButton();
   generate();
   await loadAdminRecipes();
