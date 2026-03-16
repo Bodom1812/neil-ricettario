@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/recipe/:slug",
-      "destination": "/recipe.html?slug=:slug"
+      "destination": "/api/recipe-og?slug=:slug"
     }
   ]
 }
