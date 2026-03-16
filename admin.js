@@ -1,5 +1,4 @@
-
-console.log('admin.js v20260316-3 caricato');
+console.log('admin.js DEBUG 20260316-4 caricato');
 
 let currentSession = null;
 let editingRecipeId = null;
@@ -271,7 +270,7 @@ function fillFormForEdit(recipe) {
   generate();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  console.log('Modifica ricetta ID:', editingRecipeId);
+  console.log('Modalità modifica attiva. ID:', editingRecipeId);
 }
 
 function recipeRowMarkup(recipe) {
@@ -291,22 +290,15 @@ function recipeRowMarkup(recipe) {
           <div><strong>Categoria:</strong> ${escapeHtml(recipe.category || '-')}</div>
           <div><strong>Fonte:</strong> ${escapeHtml(recipe.source || '-')}</div>
           <div><strong>Status:</strong> ${escapeHtml(recipe.status || '-')}</div>
+          <div><strong>ID:</strong> ${escapeHtml(recipe.id || '-')}</div>
         </div>
       </div>
       <div style="display:grid;gap:8px;">
-        <button type="button" data-action="edit" data-id="${escapeHtml(recipe.id)}">Modifica</button>
-        <button type="button" data-action="delete" data-id="${escapeHtml(recipe.id)}">Elimina</button>
+        <button type="button" class="edit-recipe-btn" data-id="${escapeHtml(recipe.id)}">Modifica</button>
+        <button type="button" class="delete-recipe-btn" data-id="${escapeHtml(recipe.id)}">Elimina</button>
       </div>
     </article>
   `;
-}
-
-function sortRecipesForAdmin(recipes) {
-  return [...recipes].sort((a, b) => {
-    const aDate = new Date(a.updated_at || a.created_at || 0).getTime();
-    const bDate = new Date(b.updated_at || b.created_at || 0).getTime();
-    return bDate - aDate;
-  });
 }
 
 function renderAdminRecipesList(recipes) {
@@ -317,30 +309,49 @@ function renderAdminRecipesList(recipes) {
     return;
   }
 
-  fields.adminRecipesList.innerHTML = sortRecipesForAdmin(recipes)
-    .map(recipeRowMarkup)
-    .join('');
+  fields.adminRecipesList.innerHTML = recipes.map(recipeRowMarkup).join('');
+
+  const editButtons = fields.adminRecipesList.querySelectorAll('.edit-recipe-btn');
+  const deleteButtons = fields.adminRecipesList.querySelectorAll('.delete-recipe-btn');
+
+  editButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const recipeId = button.dataset.id;
+      console.log('Click MODIFICA su ID:', recipeId);
+      editRecipeById(recipeId);
+    });
+  });
+
+  deleteButtons.forEach((button) => {
+    button.addEventListener('click', async () => {
+      const recipeId = button.dataset.id;
+      console.log('Click ELIMINA su ID:', recipeId);
+      await deleteRecipe(recipeId);
+    });
+  });
+
+  console.log('Lista admin renderizzata con', recipes.length, 'ricette');
 }
 
 async function loadAdminRecipes() {
   if (!fields.adminRecipesList) return;
 
   fields.adminRecipesList.innerHTML = 'Caricamento ricette...';
+  console.log('loadAdminRecipes() avviata');
 
   try {
     const { data, error } = await window.supabaseClient
       .from('recipes')
       .select('*')
-      .order('updated_at', { ascending: false });
+      .order('title', { ascending: true });
 
     if (error) {
       throw new Error(error.message);
     }
 
     window.__adminRecipes = Array.isArray(data) ? data : [];
+    console.log('Ricette admin caricate:', window.__adminRecipes.length, window.__adminRecipes);
     renderAdminRecipesList(window.__adminRecipes);
-
-    console.log('Ricette caricate:', window.__adminRecipes.length, window.__adminRecipes);
   } catch (err) {
     console.error('Errore loadAdminRecipes:', err);
     fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${escapeHtml(err.message)}</div>`;
@@ -396,6 +407,8 @@ async function saveToSupabase() {
     let result;
 
     if (originalEditingId) {
+      console.log('UPDATE ricetta ID:', originalEditingId, payload);
+
       result = await window.supabaseClient
         .from('recipes')
         .update(payload)
@@ -403,6 +416,8 @@ async function saveToSupabase() {
         .select()
         .single();
     } else {
+      console.log('INSERT nuova ricetta:', payload);
+
       result = await window.supabaseClient
         .from('recipes')
         .insert([
@@ -419,7 +434,7 @@ async function saveToSupabase() {
       throw new Error((originalEditingId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') + result.error.message);
     }
 
-    console.log('Ricetta salvata/aggiornata:', result.data);
+    console.log('Save OK, risultato:', result.data);
 
     await loadAdminRecipes();
     clearForm(false);
@@ -446,13 +461,15 @@ async function deleteRecipe(recipeId) {
   if (!confirmDelete) return;
 
   try {
-    console.log('Tentativo eliminazione ricetta ID:', recipeId);
+    console.log('DELETE tentata su ID:', recipeId);
 
     const { data, error } = await window.supabaseClient
       .from('recipes')
       .delete()
       .eq('id', recipeId)
       .select();
+
+    console.log('DELETE risposta:', { data, error });
 
     if (error) {
       throw new Error('Eliminazione fallita: ' + error.message);
@@ -557,29 +574,6 @@ function bindStaticEvents() {
         `;
       } else {
         generate();
-      }
-    });
-  }
-
-  if (fields.adminRecipesList) {
-    fields.adminRecipesList.addEventListener('click', async (event) => {
-      const button = event.target.closest('button[data-action]');
-      if (!button) return;
-
-      const action = button.dataset.action;
-      const recipeId = button.dataset.id;
-
-      console.log('Click lista admin:', action, recipeId);
-
-      if (!recipeId) return;
-
-      if (action === 'edit') {
-        editRecipeById(recipeId);
-        return;
-      }
-
-      if (action === 'delete') {
-        await deleteRecipe(recipeId);
       }
     });
   }
