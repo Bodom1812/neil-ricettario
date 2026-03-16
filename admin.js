@@ -362,26 +362,9 @@ async function saveToSupabase() {
 
     console.log('Ricetta salvata/aggiornata:', result.data);
 
-    fields.image.value = imageUrl;
-    fields.output.value = JSON.stringify(result.data, null, 2);
-    renderPreview(result.data);
-
-    if (!window.__adminRecipes) window.__adminRecipes = [];
-
-    if (editingRecipeId) {
-      window.__adminRecipes = window.__adminRecipes.map(r =>
-        r.id === result.data.id ? result.data : r
-      );
-    } else {
-      window.__adminRecipes.unshift(result.data);
-    }
-
-    renderAdminRecipesList(window.__adminRecipes);
-
     alert(editingRecipeId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
 
-    clearForm(false);
-    await loadAdminRecipes();
+    window.location.reload();
   } catch (err) {
     console.error(err);
     alert(err.message || 'Errore durante il salvataggio.');
@@ -405,16 +388,9 @@ async function deleteRecipe(recipeId, recipeTitle) {
       throw new Error('Eliminazione fallita: ' + error.message);
     }
 
-    if (editingRecipeId === recipeId) {
-      clearForm();
-    }
-
-    if (!window.__adminRecipes) window.__adminRecipes = [];
-    window.__adminRecipes = window.__adminRecipes.filter(r => r.id !== recipeId);
-    renderAdminRecipesList(window.__adminRecipes);
-
     alert('Ricetta eliminata.');
-    await loadAdminRecipes();
+
+    window.location.reload();
   } catch (err) {
     console.error(err);
     alert(err.message || 'Errore durante l’eliminazione.');
