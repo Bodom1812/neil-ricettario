@@ -1,4 +1,4 @@
-console.log('admin.js DEBUG 20260316-4 caricato');
+console.log('admin.js DEBUG 20260316-5 caricato');
 
 let currentSession = null;
 let editingRecipeId = null;
@@ -85,6 +85,10 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function normalizeId(value) {
+  return String(value ?? '').trim();
+}
+
 function normalizeImagePath(value) {
   const v = (value || '').trim();
   if (!v) return '';
@@ -125,7 +129,7 @@ function validate(recipe) {
   if (!recipe.steps.length) return 'Inserisci almeno un passaggio.';
 
   const existingRecipe = editingRecipeId
-    ? (window.__adminRecipes || []).find((r) => r.id === editingRecipeId)
+    ? (window.__adminRecipes || []).find((r) => normalizeId(r.id) === normalizeId(editingRecipeId))
     : null;
 
   const hasExistingImage = !!(existingRecipe && (existingRecipe.image_url || existingRecipe.image));
@@ -249,7 +253,7 @@ function clearForm(resetOutput = true) {
 }
 
 function fillFormForEdit(recipe) {
-  editingRecipeId = recipe.id || null;
+  editingRecipeId = normalizeId(recipe.id);
 
   fields.title.value = recipe.title || '';
   fields.category.value = recipe.category || 'Dolci';
@@ -275,6 +279,7 @@ function fillFormForEdit(recipe) {
 
 function recipeRowMarkup(recipe) {
   const imageSrc = recipe.image_url || recipe.image || '';
+  const recipeId = normalizeId(recipe.id);
 
   return `
     <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
@@ -290,12 +295,12 @@ function recipeRowMarkup(recipe) {
           <div><strong>Categoria:</strong> ${escapeHtml(recipe.category || '-')}</div>
           <div><strong>Fonte:</strong> ${escapeHtml(recipe.source || '-')}</div>
           <div><strong>Status:</strong> ${escapeHtml(recipe.status || '-')}</div>
-          <div><strong>ID:</strong> ${escapeHtml(recipe.id || '-')}</div>
+          <div><strong>ID:</strong> ${escapeHtml(recipeId || '-')}</div>
         </div>
       </div>
       <div style="display:grid;gap:8px;">
-        <button type="button" class="edit-recipe-btn" data-id="${escapeHtml(recipe.id)}">Modifica</button>
-        <button type="button" class="delete-recipe-btn" data-id="${escapeHtml(recipe.id)}">Elimina</button>
+        <button type="button" class="edit-recipe-btn" data-id="${escapeHtml(recipeId)}">Modifica</button>
+        <button type="button" class="delete-recipe-btn" data-id="${escapeHtml(recipeId)}">Elimina</button>
       </div>
     </article>
   `;
@@ -316,7 +321,7 @@ function renderAdminRecipesList(recipes) {
 
   editButtons.forEach((button) => {
     button.addEventListener('click', () => {
-      const recipeId = button.dataset.id;
+      const recipeId = normalizeId(button.dataset.id);
       console.log('Click MODIFICA su ID:', recipeId);
       editRecipeById(recipeId);
     });
@@ -324,7 +329,7 @@ function renderAdminRecipesList(recipes) {
 
   deleteButtons.forEach((button) => {
     button.addEventListener('click', async () => {
-      const recipeId = button.dataset.id;
+      const recipeId = normalizeId(button.dataset.id);
       console.log('Click ELIMINA su ID:', recipeId);
       await deleteRecipe(recipeId);
     });
@@ -371,7 +376,7 @@ async function saveToSupabase() {
   if (!session) return;
 
   const btn = fields.saveSupabase;
-  const originalEditingId = editingRecipeId;
+  const originalEditingId = editingRecipeId ? normalizeId(editingRecipeId) : null;
 
   try {
     btn.disabled = true;
@@ -382,7 +387,9 @@ async function saveToSupabase() {
     if (fields.imageFile.files[0]) {
       imageUrl = await uploadImageIfNeeded();
     } else if (originalEditingId) {
-      const existingRecipe = (window.__adminRecipes || []).find((r) => r.id === originalEditingId);
+      const existingRecipe = (window.__adminRecipes || []).find(
+        (r) => normalizeId(r.id) === originalEditingId
+      );
       if (!imageUrl && existingRecipe?.image_url) {
         imageUrl = existingRecipe.image_url;
       }
@@ -431,14 +438,33 @@ async function saveToSupabase() {
     }
 
     if (result.error) {
-      throw new Error((originalEditingId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') + result.error.message);
+      throw new Error(
+        (originalEditingId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') +
+          result.error.message
+      );
     }
 
     console.log('Save OK, risultato:', result.data);
 
+    const savedRecipe = result.data;
+
+    if (originalEditingId) {
+      window.__adminRecipes = (window.__adminRecipes || []).map((r) =>
+        normalizeId(r.id) === originalEditingId ? savedRecipe : r
+      );
+    } else {
+      window.__adminRecipes = [...(window.__adminRecipes || []), savedRecipe];
+    }
+
+    renderAdminRecipesList(
+      [...window.__adminRecipes].sort((a, b) =>
+        String(a.title || '').localeCompare(String(b.title || ''), 'it', { sensitivity: 'base' })
+      )
+    );
+
     await loadAdminRecipes();
     clearForm(false);
-    fields.output.value = JSON.stringify(result.data, null, 2);
+    fields.output.value = JSON.stringify(savedRecipe, null, 2);
 
     alert(originalEditingId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
   } catch (err) {
@@ -451,7 +477,11 @@ async function saveToSupabase() {
 }
 
 async function deleteRecipe(recipeId) {
-  const recipe = (window.__adminRecipes || []).find((r) => r.id === recipeId);
+  const normalizedRecipeId = normalizeId(recipeId);
+
+  const recipe = (window.__adminRecipes || []).find(
+    (r) => normalizeId(r.id) === normalizedRecipeId
+  );
   const recipeTitle = recipe?.title || 'questa ricetta';
 
   const session = await requireAuth();
@@ -461,12 +491,12 @@ async function deleteRecipe(recipeId) {
   if (!confirmDelete) return;
 
   try {
-    console.log('DELETE tentata su ID:', recipeId);
+    console.log('DELETE tentata su ID:', normalizedRecipeId);
 
     const { data, error } = await window.supabaseClient
       .from('recipes')
       .delete()
-      .eq('id', recipeId)
+      .eq('id', normalizedRecipeId)
       .select();
 
     console.log('DELETE risposta:', { data, error });
@@ -479,7 +509,17 @@ async function deleteRecipe(recipeId) {
       throw new Error('Nessuna ricetta eliminata. Controlla la policy DELETE in Supabase.');
     }
 
-    if (editingRecipeId === recipeId) {
+    window.__adminRecipes = (window.__adminRecipes || []).filter(
+      (r) => normalizeId(r.id) !== normalizedRecipeId
+    );
+
+    renderAdminRecipesList(
+      [...window.__adminRecipes].sort((a, b) =>
+        String(a.title || '').localeCompare(String(b.title || ''), 'it', { sensitivity: 'base' })
+      )
+    );
+
+    if (normalizeId(editingRecipeId) === normalizedRecipeId) {
       clearForm();
     }
 
@@ -492,7 +532,11 @@ async function deleteRecipe(recipeId) {
 }
 
 function editRecipeById(recipeId) {
-  const recipe = (window.__adminRecipes || []).find((r) => r.id === recipeId);
+  const normalizedRecipeId = normalizeId(recipeId);
+
+  const recipe = (window.__adminRecipes || []).find(
+    (r) => normalizeId(r.id) === normalizedRecipeId
+  );
 
   if (!recipe) {
     alert('Ricetta non trovata.');
