@@ -1,5 +1,6 @@
 let currentSession = null;
 let editingRecipeId = null;
+window.__adminRecipes = Array.isArray(window.__adminRecipes) ? window.__adminRecipes : [];
 
 async function requireAuth() {
   const { data, error } = await window.supabaseClient.auth.getSession();
@@ -71,7 +72,7 @@ const fields = {
 };
 
 function normalizeImagePath(value) {
-  const v = value.trim();
+  const v = (value || '').trim();
   if (!v) return '';
   if (v.startsWith('http://') || v.startsWith('https://')) return v;
   if (v.startsWith('images/')) return v;
@@ -79,7 +80,7 @@ function normalizeImagePath(value) {
 }
 
 function toLines(value) {
-  return value
+  return (value || '')
     .split('\n')
     .map(v => v.trim())
     .filter(Boolean);
@@ -114,28 +115,37 @@ function validate(recipe) {
   return '';
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderPreview(recipe) {
   const previewImage = recipe.image_url || '';
   fields.preview.classList.remove('empty');
   fields.preview.innerHTML = `
-    <img class="preview-img" src="${previewImage}" alt="${recipe.title || 'Anteprima'}" onerror="this.style.display='none'">
-    <h3>${recipe.title || 'Titolo ricetta'}</h3>
+    <img class="preview-img" src="${escapeHtml(previewImage)}" alt="${escapeHtml(recipe.title || 'Anteprima')}" onerror="this.style.display='none'">
+    <h3>${escapeHtml(recipe.title || 'Titolo ricetta')}</h3>
     <div class="preview-tags">
-      <span class="tag">${recipe.category || 'Categoria'}</span>
-      ${recipe.prep_time ? `<span class="tag">Prep: ${recipe.prep_time}</span>` : ''}
-      ${recipe.cook_time ? `<span class="tag">Cottura: ${recipe.cook_time}</span>` : ''}
-      ${recipe.servings ? `<span class="tag">${recipe.servings}</span>` : ''}
-      ${recipe.difficulty ? `<span class="tag">${recipe.difficulty}</span>` : ''}
-      ${recipe.status ? `<span class="tag">${recipe.status}</span>` : ''}
+      <span class="tag">${escapeHtml(recipe.category || 'Categoria')}</span>
+      ${recipe.prep_time ? `<span class="tag">Prep: ${escapeHtml(recipe.prep_time)}</span>` : ''}
+      ${recipe.cook_time ? `<span class="tag">Cottura: ${escapeHtml(recipe.cook_time)}</span>` : ''}
+      ${recipe.servings ? `<span class="tag">${escapeHtml(recipe.servings)}</span>` : ''}
+      ${recipe.difficulty ? `<span class="tag">${escapeHtml(recipe.difficulty)}</span>` : ''}
+      ${recipe.status ? `<span class="tag">${escapeHtml(recipe.status)}</span>` : ''}
       ${editingRecipeId ? `<span class="tag">modifica</span>` : `<span class="tag">nuova</span>`}
     </div>
     <strong>Ingredienti</strong>
     <ul class="preview-list">
-      ${recipe.ingredients.slice(0, 6).map(i => `<li>${i}</li>`).join('')}
+      ${recipe.ingredients.slice(0, 6).map(i => `<li>${escapeHtml(i)}</li>`).join('')}
     </ul>
     <strong>Procedimento</strong>
     <ol class="preview-list">
-      ${recipe.steps.slice(0, 4).map(i => `<li>${i}</li>`).join('')}
+      ${recipe.steps.slice(0, 4).map(i => `<li>${escapeHtml(i)}</li>`).join('')}
     </ol>
   `;
 }
@@ -242,21 +252,29 @@ function recipeRowMarkup(recipe) {
   const imageSrc = recipe.image_url || recipe.image || '';
   return `
     <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
-      <img src="${imageSrc}" alt="${recipe.title}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
+      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(recipe.title)}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
       <div style="min-width:0;">
-        <h3 style="margin:0 0 6px;font-size:18px;">${recipe.title}</h3>
+        <h3 style="margin:0 0 6px;font-size:18px;">${escapeHtml(recipe.title)}</h3>
         <div style="font-size:13px;color:var(--muted);line-height:1.5;">
-          <div><strong>Categoria:</strong> ${recipe.category || '-'}</div>
-          <div><strong>Fonte:</strong> ${recipe.source || '-'}</div>
-          <div><strong>Status:</strong> ${recipe.status || '-'}</div>
+          <div><strong>Categoria:</strong> ${escapeHtml(recipe.category || '-')}</div>
+          <div><strong>Fonte:</strong> ${escapeHtml(recipe.source || '-')}</div>
+          <div><strong>Status:</strong> ${escapeHtml(recipe.status || '-')}</div>
         </div>
       </div>
       <div style="display:grid;gap:8px;">
         <button type="button" onclick="editRecipePublic('${recipe.id}')">Modifica</button>
-        <button type="button" onclick="deleteRecipePublic('${recipe.id}', ${JSON.stringify(recipe.title)})">Elimina</button>
+        <button type="button" onclick="deleteRecipePublic('${recipe.id}', ${JSON.stringify(recipe.title || '')})">Elimina</button>
       </div>
     </article>
   `;
+}
+
+function sortRecipesForAdmin(recipes) {
+  return [...recipes].sort((a, b) => {
+    const aDate = new Date(a.updated_at || a.created_at || 0).getTime();
+    const bDate = new Date(b.updated_at || b.created_at || 0).getTime();
+    return bDate - aDate;
+  });
 }
 
 function renderAdminRecipesList(recipes) {
@@ -267,7 +285,27 @@ function renderAdminRecipesList(recipes) {
     return;
   }
 
-  fields.adminRecipesList.innerHTML = recipes.map(recipeRowMarkup).join('');
+  fields.adminRecipesList.innerHTML = sortRecipesForAdmin(recipes).map(recipeRowMarkup).join('');
+}
+
+function upsertAdminRecipe(recipe) {
+  const current = Array.isArray(window.__adminRecipes) ? [...window.__adminRecipes] : [];
+  const index = current.findIndex(r => r.id === recipe.id);
+
+  if (index >= 0) {
+    current[index] = recipe;
+  } else {
+    current.unshift(recipe);
+  }
+
+  window.__adminRecipes = sortRecipesForAdmin(current);
+  renderAdminRecipesList(window.__adminRecipes);
+}
+
+function removeAdminRecipe(recipeId) {
+  const current = Array.isArray(window.__adminRecipes) ? window.__adminRecipes : [];
+  window.__adminRecipes = current.filter(r => r.id !== recipeId);
+  renderAdminRecipesList(window.__adminRecipes);
 }
 
 async function loadAdminRecipes() {
@@ -285,11 +323,11 @@ async function loadAdminRecipes() {
       throw new Error(error.message);
     }
 
-    window.__adminRecipes = data || [];
+    window.__adminRecipes = Array.isArray(data) ? data : [];
     renderAdminRecipesList(window.__adminRecipes);
   } catch (err) {
     console.error(err);
-    fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${err.message}</div>`;
+    fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -306,16 +344,21 @@ async function saveToSupabase() {
   if (!session) return;
 
   const btn = fields.saveSupabase;
-  const originalText = btn.textContent;
+  const originalEditingId = editingRecipeId;
 
   try {
     btn.disabled = true;
-    btn.textContent = editingRecipeId ? 'Aggiornamento...' : 'Salvataggio...';
+    btn.textContent = originalEditingId ? 'Aggiornamento...' : 'Salvataggio...';
 
     let imageUrl = recipe.image_url;
 
     if (fields.imageFile.files[0]) {
       imageUrl = await uploadImageIfNeeded();
+    } else if (originalEditingId) {
+      const existingRecipe = (window.__adminRecipes || []).find(r => r.id === originalEditingId);
+      if (!imageUrl && existingRecipe?.image_url) {
+        imageUrl = existingRecipe.image_url;
+      }
     }
 
     const payload = {
@@ -336,11 +379,11 @@ async function saveToSupabase() {
 
     let result;
 
-    if (editingRecipeId) {
+    if (originalEditingId) {
       result = await window.supabaseClient
         .from('recipes')
         .update(payload)
-        .eq('id', editingRecipeId)
+        .eq('id', originalEditingId)
         .select()
         .single();
     } else {
@@ -357,14 +400,16 @@ async function saveToSupabase() {
     }
 
     if (result.error) {
-      throw new Error((editingRecipeId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') + result.error.message);
+      throw new Error((originalEditingId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') + result.error.message);
     }
 
     console.log('Ricetta salvata/aggiornata:', result.data);
 
-    alert(editingRecipeId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
+    upsertAdminRecipe(result.data);
+    clearForm(false);
+    fields.output.value = JSON.stringify(result.data, null, 2);
 
-    window.location.reload();
+    alert(originalEditingId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
   } catch (err) {
     console.error(err);
     alert(err.message || 'Errore durante il salvataggio.');
@@ -388,9 +433,12 @@ async function deleteRecipe(recipeId, recipeTitle) {
       throw new Error('Eliminazione fallita: ' + error.message);
     }
 
-    alert('Ricetta eliminata.');
+    if (editingRecipeId === recipeId) {
+      clearForm();
+    }
 
-    window.location.reload();
+    removeAdminRecipe(recipeId);
+    alert('Ricetta eliminata.');
   } catch (err) {
     console.error(err);
     alert(err.message || 'Errore durante l’eliminazione.');
@@ -446,8 +494,8 @@ if (fields.imageFile) {
       fields.preview.classList.remove('empty');
       fields.preview.innerHTML = `
         <img class="preview-img" src="${URL.createObjectURL(file)}" alt="Anteprima immagine">
-        <h3>${fields.title.value.trim() || 'Titolo ricetta'}</h3>
-        <p>Immagine selezionata: ${file.name}</p>
+        <h3>${escapeHtml(fields.title.value.trim() || 'Titolo ricetta')}</h3>
+        <p>Immagine selezionata: ${escapeHtml(file.name)}</p>
       `;
     } else {
       generate();
