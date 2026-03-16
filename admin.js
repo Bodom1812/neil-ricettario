@@ -186,6 +186,58 @@ async function uploadImageIfNeeded() {
   return data.publicUrl;
 }
 
+function updateSaveButton() {
+  fields.saveSupabase.textContent = editingRecipeId ? 'Aggiorna ricetta' : 'Salva su Supabase';
+}
+
+function clearForm(resetOutput = true) {
+  [
+    fields.title, fields.prep, fields.cook, fields.rest, fields.total,
+    fields.servings, fields.source, fields.image, fields.ingredients, fields.steps
+  ].forEach(el => {
+    if (el) el.value = '';
+  });
+
+  if (fields.imageFile) fields.imageFile.value = '';
+  if (fields.category) fields.category.selectedIndex = 0;
+  if (fields.difficulty) fields.difficulty.selectedIndex = 0;
+
+  if (resetOutput && fields.output) fields.output.value = '';
+
+  if (fields.preview) {
+    fields.preview.className = 'preview-card empty';
+    fields.preview.textContent = 'Compila il form per vedere l’anteprima.';
+  }
+
+  editingRecipeId = null;
+  updateSaveButton();
+}
+
+function fillFormForEdit(recipe) {
+  editingRecipeId = recipe.id || null;
+
+  fields.title.value = recipe.title || '';
+  fields.category.value = recipe.category || 'Dolci';
+  fields.prep.value = recipe.prep_time || '';
+  fields.cook.value = recipe.cook_time || '';
+  fields.rest.value = recipe.rest_time || '';
+  fields.total.value = recipe.total_time || '';
+  fields.servings.value = recipe.servings || '';
+  fields.difficulty.value = recipe.difficulty || 'Molto facile';
+  fields.source.value = recipe.source || '';
+  fields.image.value = recipe.image_url || recipe.image || '';
+  fields.ingredients.value = Array.isArray(recipe.ingredients) ? recipe.ingredients.join('\n') : '';
+  fields.steps.value = Array.isArray(recipe.steps) ? recipe.steps.join('\n') : '';
+
+  if (fields.imageFile) fields.imageFile.value = '';
+
+  updateSaveButton();
+  generate();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  console.log('Modalità modifica attiva. ID ricetta:', editingRecipeId);
+}
+
 async function saveToSupabase() {
   const recipe = getRecipeObject();
   const errorMsg = validate(recipe);
@@ -224,8 +276,7 @@ async function saveToSupabase() {
       ingredients: recipe.ingredients,
       steps: recipe.steps,
       source: recipe.source,
-      status: recipe.status,
-      created_by: session.user.id
+      status: recipe.status
     };
 
     let result;
@@ -234,20 +285,31 @@ async function saveToSupabase() {
       result = await window.supabaseClient
         .from('recipes')
         .update(payload)
-        .eq('id', editingRecipeId);
+        .eq('id', editingRecipeId)
+        .select()
+        .single();
     } else {
       result = await window.supabaseClient
         .from('recipes')
-        .insert([payload]);
+        .insert([
+          {
+            ...payload,
+            created_by: session.user.id
+          }
+        ])
+        .select()
+        .single();
     }
 
     if (result.error) {
       throw new Error((editingRecipeId ? 'Aggiornamento ricetta fallito: ' : 'Salvataggio ricetta fallito: ') + result.error.message);
     }
 
+    console.log('Ricetta salvata/aggiornata:', result.data);
+
     fields.image.value = imageUrl;
-    fields.output.value = JSON.stringify(payload, null, 2);
-    renderPreview(payload);
+    fields.output.value = JSON.stringify(result.data, null, 2);
+    renderPreview(result.data);
 
     alert(editingRecipeId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
 
@@ -260,52 +322,6 @@ async function saveToSupabase() {
     btn.disabled = false;
     updateSaveButton();
   }
-}
-
-function updateSaveButton() {
-  fields.saveSupabase.textContent = editingRecipeId ? 'Aggiorna ricetta' : 'Salva su Supabase';
-}
-
-function clearForm(resetOutput = true) {
-  [
-    fields.title, fields.prep, fields.cook, fields.rest, fields.total,
-    fields.servings, fields.source, fields.image, fields.ingredients, fields.steps
-  ].forEach(el => el.value = '');
-
-  if (fields.imageFile) fields.imageFile.value = '';
-  fields.category.selectedIndex = 0;
-  fields.difficulty.selectedIndex = 0;
-
-  if (resetOutput) fields.output.value = '';
-
-  fields.preview.className = 'preview-card empty';
-  fields.preview.textContent = 'Compila il form per vedere l’anteprima.';
-
-  editingRecipeId = null;
-  updateSaveButton();
-}
-
-function fillFormForEdit(recipe) {
-  editingRecipeId = recipe.id || null;
-
-  fields.title.value = recipe.title || '';
-  fields.category.value = recipe.category || 'Dolci';
-  fields.prep.value = recipe.prep_time || '';
-  fields.cook.value = recipe.cook_time || '';
-  fields.rest.value = recipe.rest_time || '';
-  fields.total.value = recipe.total_time || '';
-  fields.servings.value = recipe.servings || '';
-  fields.difficulty.value = recipe.difficulty || 'Molto facile';
-  fields.source.value = recipe.source || '';
-  fields.image.value = recipe.image_url || recipe.image || '';
-  fields.ingredients.value = (recipe.ingredients || []).join('\n');
-  fields.steps.value = (recipe.steps || []).join('\n');
-
-  if (fields.imageFile) fields.imageFile.value = '';
-
-  updateSaveButton();
-  generate();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteRecipe(recipeId, recipeTitle) {
@@ -421,7 +437,9 @@ if (fields.refreshRecipes) {
 [
   fields.title, fields.category, fields.prep, fields.cook, fields.rest, fields.total,
   fields.servings, fields.difficulty, fields.source, fields.image, fields.ingredients, fields.steps
-].forEach(el => el.addEventListener('input', generate));
+].forEach(el => {
+  if (el) el.addEventListener('input', generate);
+});
 
 if (fields.imageFile) {
   fields.imageFile.addEventListener('change', () => {
