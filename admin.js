@@ -1,4 +1,4 @@
-console.log('admin.js DEBUG 20260316-5 caricato');
+console.log('admin.js DEBUG 20260316-6 slug caricato');
 
 let currentSession = null;
 let editingRecipeId = null;
@@ -104,9 +104,60 @@ function toLines(value) {
     .filter(Boolean);
 }
 
+function slugify(text) {
+  return String(text ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+async function generateUniqueSlug(title, recipeId = null) {
+  const baseSlug = slugify(title);
+
+  if (!baseSlug) {
+    throw new Error('Impossibile generare lo slug: titolo non valido.');
+  }
+
+  let slug = baseSlug;
+  let counter = 2;
+
+  while (true) {
+    let query = window.supabaseClient
+      .from('recipes')
+      .select('id, slug')
+      .eq('slug', slug);
+
+    if (recipeId) {
+      query = query.neq('id', recipeId);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      throw new Error('Errore controllo slug: ' + error.message);
+    }
+
+    if (!data || data.length === 0) {
+      return slug;
+    }
+
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+}
+
 function getRecipeObject() {
+  const title = fields.title.value.trim();
+
   return {
-    title: fields.title.value.trim(),
+    title,
+    slug: slugify(title),
     category: fields.category.value.trim(),
     prep_time: fields.prep.value.trim(),
     cook_time: fields.cook.value.trim(),
@@ -124,6 +175,7 @@ function getRecipeObject() {
 
 function validate(recipe) {
   if (!recipe.title) return 'Inserisci il titolo.';
+  if (!recipe.slug) return 'Impossibile generare lo slug dal titolo.';
   if (!recipe.category) return 'Inserisci la categoria.';
   if (!recipe.ingredients.length) return 'Inserisci almeno un ingrediente.';
   if (!recipe.steps.length) return 'Inserisci almeno un passaggio.';
@@ -150,6 +202,7 @@ function renderPreview(recipe) {
     <h3>${escapeHtml(recipe.title || 'Titolo ricetta')}</h3>
     <div class="preview-tags">
       <span class="tag">${escapeHtml(recipe.category || 'Categoria')}</span>
+      ${recipe.slug ? `<span class="tag">slug: ${escapeHtml(recipe.slug)}</span>` : ''}
       ${recipe.prep_time ? `<span class="tag">Prep: ${escapeHtml(recipe.prep_time)}</span>` : ''}
       ${recipe.cook_time ? `<span class="tag">Cottura: ${escapeHtml(recipe.cook_time)}</span>` : ''}
       ${recipe.servings ? `<span class="tag">${escapeHtml(recipe.servings)}</span>` : ''}
@@ -292,6 +345,7 @@ function recipeRowMarkup(recipe) {
       <div style="min-width:0;">
         <h3 style="margin:0 0 6px;font-size:18px;">${escapeHtml(recipe.title || '')}</h3>
         <div style="font-size:13px;color:var(--muted);line-height:1.5;">
+          <div><strong>Slug:</strong> ${escapeHtml(recipe.slug || '-')}</div>
           <div><strong>Categoria:</strong> ${escapeHtml(recipe.category || '-')}</div>
           <div><strong>Fonte:</strong> ${escapeHtml(recipe.source || '-')}</div>
           <div><strong>Status:</strong> ${escapeHtml(recipe.status || '-')}</div>
@@ -395,8 +449,11 @@ async function saveToSupabase() {
       }
     }
 
+    const uniqueSlug = await generateUniqueSlug(recipe.title, originalEditingId);
+
     const payload = {
       title: recipe.title,
+      slug: uniqueSlug,
       category: recipe.category,
       image_url: imageUrl,
       prep_time: recipe.prep_time,

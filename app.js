@@ -32,7 +32,12 @@ function slug(str){return btoa(unescape(encodeURIComponent(String(str ?? "")))).
 function showToast(text){toast.textContent=text;toast.classList.add("show");clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>toast.classList.remove("show"),1500);}
 
 function getRecipeKey(r){
-  return String(r?.id || r?.source || r?.title || "");
+  return String(r?.id || r?.slug || r?.source || r?.title || "");
+}
+
+function getRecipePageUrl(recipe){
+  if(!recipe?.slug) return "";
+  return `recipe.html?slug=${encodeURIComponent(recipe.slug)}`;
 }
 
 function isFav(key){return getFavs().includes(key);}
@@ -70,7 +75,7 @@ function toggleSection(id){
   if(panel) panel.classList.toggle("open");
 }
 function getByUrl(key){
-  return state.recipes.find(r=>getRecipeKey(r)===key || r.source===key);
+  return state.recipes.find(r=>getRecipeKey(r)===key || r.source===key || r.slug===key);
 }
 
 function matchQuick(r){
@@ -168,7 +173,7 @@ function updateHeaderMeta(items){
     info="Le tue annotazioni personali";
   } else if(state.mode==="recent"){
     title="Recenti";
-    info="Le ultime fonti aperte";
+    info="Le ultime ricette aperte";
   } else {
     const bits=[];
     if(state.quick!=="all"){
@@ -222,18 +227,24 @@ function card(r){
   const note = notes[recipeKey] || "";
   const fav = isFav(recipeKey);
   const imageSrc = r.image_url || r.image || "";
+  const recipeUrl = getRecipePageUrl(r);
 
   return `<article class="card">
     <img class="cover" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(r.title)}" loading="lazy">
     <div class="card-top">
       <div>
-        <h3 class="title">${escapeHtml(r.title)}</h3>
+        <h3 class="title">
+          ${recipeUrl
+            ? `<a href="${escapeHtml(recipeUrl)}" onclick="touchRecentPublic('${encodeURIComponent(recipeKey)}')" style="color:inherit;text-decoration:none;">${escapeHtml(r.title)}</a>`
+            : `${escapeHtml(r.title)}`}
+        </h3>
         <div class="source">Fonte: ${escapeHtml(r.source || "")}</div>
       </div>
       <button class="fav ${fav?'active':''}" onclick="toggleFavPublic('${encodeURIComponent(recipeKey)}')">${fav?'★':'☆'}</button>
     </div>
     <div class="tags">
       <span class="tag">${escapeHtml(r.category || 'Ricetta')}</span>
+      ${r.slug ? `<span class="tag">slug</span>` : ''}
       ${(r.ingredients||[]).length?`<span class="tag">${r.ingredients.length} ingredienti</span>`:''}
       ${(r.steps||[]).length?`<span class="tag">${r.steps.length} passaggi</span>`:''}
       ${note.trim()?`<span class="tag">con nota</span>`:''}
@@ -242,8 +253,15 @@ function card(r){
     ${sectionMarkup(r,'ingredients','Ingredienti','voci')}
     ${sectionMarkup(r,'steps','Procedimento','passaggi')}
     <div class="actions">
-      ${r.source ? `<button class="primary" onclick="openRecipePublic('${encodeURIComponent(r.source)}','${encodeURIComponent(recipeKey)}')">Apri fonte</button>` : `<button class="primary" disabled>Nessuna fonte</button>`}
-      ${r.source ? `<button onclick="copyLinkPublic('${encodeURIComponent(r.source)}')">Copia link</button>` : `<button disabled>Copia link</button>`}
+      ${recipeUrl
+        ? `<button class="primary" onclick="openRecipePublic('${encodeURIComponent(recipeUrl)}','${encodeURIComponent(recipeKey)}')">Apri ricetta</button>`
+        : `<button class="primary" disabled>Ricetta non disponibile</button>`}
+      ${r.source
+        ? `<button onclick="openRecipePublic('${encodeURIComponent(r.source)}','${encodeURIComponent(recipeKey)}')">Apri fonte</button>`
+        : `<button disabled>Nessuna fonte</button>`}
+      ${recipeUrl
+        ? `<button onclick="copyLinkPublic('${encodeURIComponent(new URL(recipeUrl, window.location.href).href)}')">Copia link</button>`
+        : `<button disabled>Copia link</button>`}
       <button onclick="toggleNotePublic('${encodeURIComponent(recipeKey)}')">${note.trim()?'Modifica nota':'Aggiungi nota'}</button>
     </div>
     <div id="note-preview-${slug(recipeKey)}" class="note-preview" style="${note.trim()?'display:block':'display:none'}">${escapeHtml(note)}</div>
@@ -282,6 +300,7 @@ window.toggleNotePublic=enc=>toggleNote(decodeURIComponent(enc));
 window.saveNotePublic=enc=>saveNote(decodeURIComponent(enc));
 window.deleteNotePublic=enc=>deleteNote(decodeURIComponent(enc));
 window.toggleSectionPublic=id=>toggleSection(id);
+window.touchRecentPublic=enc=>touchRecent(decodeURIComponent(enc));
 
 searchEl.addEventListener("input",e=>{
   state.search=e.target.value;
@@ -396,10 +415,12 @@ async function boot() {
   state.recipes = recipes.map(r => ({
     ...r,
     image_url: r.image_url || r.image || "",
+    slug: r.slug || "",
     _haystack: [
       r.title,
       r.category,
       r.source,
+      r.slug,
       ...(r.ingredients || []),
       ...(r.steps || [])
     ].join(" ").toLowerCase()

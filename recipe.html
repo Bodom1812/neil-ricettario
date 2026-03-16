@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ricetta | Ricettario Neil</title>
+  <meta name="description" content="Ricetta del Ricettario Neil" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .recipe-page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px 64px;
+    }
+
+    .recipe-hero {
+      display: grid;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+
+    .recipe-hero img {
+      width: 100%;
+      max-height: 420px;
+      object-fit: cover;
+      border-radius: 20px;
+      display: block;
+    }
+
+    .recipe-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0 0;
+    }
+
+    .recipe-meta .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.08);
+      font-size: 14px;
+    }
+
+    .recipe-section {
+      margin-top: 28px;
+    }
+
+    .recipe-section h2 {
+      margin-bottom: 12px;
+    }
+
+    .recipe-list {
+      line-height: 1.7;
+      padding-left: 20px;
+    }
+
+    .recipe-not-found {
+      max-width: 700px;
+      margin: 60px auto;
+      padding: 24px;
+      text-align: center;
+      border-radius: 20px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <main id="recipeApp" class="recipe-page">
+    <p>Caricamento ricetta...</p>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase.js"></script>
+  <script>
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getSlugFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      return (params.get('slug') || '').trim();
+    }
+
+    function renderNotFound() {
+      const app = document.getElementById('recipeApp');
+      document.title = 'Ricetta non trovata | Ricettario Neil';
+
+      app.innerHTML = `
+        <div class="recipe-not-found">
+          <h1>Ricetta non trovata</h1>
+          <p>La ricetta richiesta non è disponibile o non è pubblicata.</p>
+          <p><a href="index.html">Torna al ricettario</a></p>
+        </div>
+      `;
+    }
+
+    function updateSeo(recipe) {
+      document.title = `${recipe.title} | Ricettario Neil`;
+
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        const description =
+          recipe.source
+            ? `${recipe.title} - Ricetta dal Ricettario Neil. Fonte: ${recipe.source}.`
+            : `${recipe.title} - Ricetta dal Ricettario Neil.`;
+
+        metaDescription.setAttribute('content', description);
+      }
+    }
+
+    function renderRecipe(recipe) {
+      const app = document.getElementById('recipeApp');
+      const imageSrc = recipe.image_url || '';
+      const ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+      const steps = Array.isArray(recipe.steps) ? recipe.steps : [];
+
+      updateSeo(recipe);
+
+      app.innerHTML = `
+        <a class="back-link" href="index.html">← Torna al ricettario</a>
+
+        <article>
+          <section class="recipe-hero">
+            ${imageSrc ? `<img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(recipe.title)}" />` : ''}
+            <div>
+              <h1>${escapeHtml(recipe.title || '')}</h1>
+              ${recipe.source ? `<p><strong>Fonte:</strong> ${escapeHtml(recipe.source)}</p>` : ''}
+              <div class="recipe-meta">
+                ${recipe.category ? `<span class="tag">${escapeHtml(recipe.category)}</span>` : ''}
+                ${recipe.prep_time ? `<span class="tag">Prep: ${escapeHtml(recipe.prep_time)}</span>` : ''}
+                ${recipe.cook_time ? `<span class="tag">Cottura: ${escapeHtml(recipe.cook_time)}</span>` : ''}
+                ${recipe.rest_time ? `<span class="tag">Riposo: ${escapeHtml(recipe.rest_time)}</span>` : ''}
+                ${recipe.total_time ? `<span class="tag">Totale: ${escapeHtml(recipe.total_time)}</span>` : ''}
+                ${recipe.servings ? `<span class="tag">Porzioni: ${escapeHtml(recipe.servings)}</span>` : ''}
+                ${recipe.difficulty ? `<span class="tag">${escapeHtml(recipe.difficulty)}</span>` : ''}
+              </div>
+            </div>
+          </section>
+
+          <section class="recipe-section">
+            <h2>Ingredienti</h2>
+            <ul class="recipe-list">
+              ${ingredients.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+            </ul>
+          </section>
+
+          <section class="recipe-section">
+            <h2>Procedimento</h2>
+            <ol class="recipe-list">
+              ${steps.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+            </ol>
+          </section>
+        </article>
+      `;
+    }
+
+    async function loadRecipe() {
+      const slug = getSlugFromUrl();
+
+      if (!slug) {
+        renderNotFound();
+        return;
+      }
+
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('recipes')
+          .select('*')
+          .eq('slug', slug)
+          .eq('status', 'published')
+          .maybeSingle();
+
+        if (error) {
+          throw error;
+        }
+
+        if (!data) {
+          renderNotFound();
+          return;
+        }
+
+        renderRecipe(data);
+      } catch (err) {
+        console.error('Errore caricamento ricetta:', err);
+        renderNotFound();
+      }
+    }
+
+    loadRecipe();
+  </script>
+</body>
+</html>
