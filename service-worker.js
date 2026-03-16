@@ -1,14 +1,14 @@
-const CACHE_NAME = 'ricettario-neil-v4-2026-recipe-pages';
+const CACHE_NAME = 'ricettario-neil-v5-2026-navigation-fix';
 
 const APP_SHELL = [
-  './',
-  './index.html',
-  './recipe.html',
-  './styles.css',
-  './app.js',
-  './manifest.json',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  '/',
+  '/index.html',
+  '/recipe.html',
+  '/styles.css',
+  '/app.js',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -38,10 +38,9 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Non cacheare richieste non-http(s)
   if (!url.protocol.startsWith('http')) return;
 
-  // Non cacheare Supabase o altre API esterne
+  // Non cacheare Supabase o CDN esterni
   if (
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('cdn.jsdelivr.net')
@@ -51,7 +50,7 @@ self.addEventListener('fetch', (event) => {
 
   const pathname = url.pathname;
 
-  // Non cacheare area admin / login / file sensibili
+  // Non cacheare admin / login / file sensibili
   if (
     pathname.endsWith('/admin.html') ||
     pathname.endsWith('/login.html') ||
@@ -65,34 +64,41 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Non cacheare querystring dinamiche tranne recipe.html?slug=...
-  const isRecipePage = pathname.endsWith('/recipe.html') || pathname.endsWith('recipe.html');
-  if (url.search && !isRecipePage) {
-    return;
-  }
-
-  // Per recipe.html?slug=... usiamo network-first così non rimane bloccata in cache
-  if (isRecipePage) {
+  // Per tutte le navigazioni HTML: network-first
+  if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200) {
-            return networkResponse;
-          }
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
 
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put('./recipe.html', responseClone).catch(() => {});
-          });
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone).catch(() => {});
+            });
+          }
 
           return networkResponse;
         })
-        .catch(() => caches.match('./recipe.html'))
+        .catch(async () => {
+          const cachedPage = await caches.match(request);
+          if (cachedPage) return cachedPage;
+
+          if (pathname.startsWith('/recipe/')) {
+            return caches.match('/recipe.html');
+          }
+
+          return caches.match('/index.html');
+        })
     );
     return;
   }
 
-  // Cache-first per il resto del sito pubblico
+  // Non cacheare URL con querystring dinamiche
+  if (url.search) {
+    return;
+  }
+
+  // Cache-first per asset statici del sito pubblico
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
@@ -105,8 +111,7 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           }
 
-          const isSameOrigin = url.origin === self.location.origin;
-          if (!isSameOrigin) {
+          if (url.origin !== self.location.origin) {
             return networkResponse;
           }
 
@@ -118,17 +123,7 @@ self.addEventListener('fetch', (event) => {
 
           return networkResponse;
         })
-        .catch(() => {
-          if (
-            pathname.endsWith('/') ||
-            pathname.endsWith('/index.html') ||
-            pathname === self.location.pathname.replace('service-worker.js', '')
-          ) {
-            return caches.match('./index.html');
-          }
-
-          return caches.match(request);
-        });
+        .catch(() => caches.match(request));
     })
   );
 });
