@@ -1,8 +1,9 @@
-const CACHE_NAME = 'ricettario-neil-v3-2026-public-only';
+const CACHE_NAME = 'ricettario-neil-v4-2026-recipe-pages';
 
 const APP_SHELL = [
   './',
   './index.html',
+  './recipe.html',
   './styles.css',
   './app.js',
   './manifest.json',
@@ -54,6 +55,8 @@ self.addEventListener('fetch', (event) => {
   if (
     pathname.endsWith('/admin.html') ||
     pathname.endsWith('/login.html') ||
+    pathname.endsWith('/reset-password.html') ||
+    pathname.endsWith('/update-password.html') ||
     pathname.endsWith('/supabase.js') ||
     pathname.endsWith('/admin.js') ||
     pathname.endsWith('/login.js') ||
@@ -62,12 +65,34 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Non cacheare querystring dinamiche
-  if (url.search) {
+  // Non cacheare querystring dinamiche tranne recipe.html?slug=...
+  const isRecipePage = pathname.endsWith('/recipe.html') || pathname.endsWith('recipe.html');
+  if (url.search && !isRecipePage) {
     return;
   }
 
-  // Cache solo per il sito pubblico
+  // Per recipe.html?slug=... usiamo network-first così non rimane bloccata in cache
+  if (isRecipePage) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (!networkResponse || networkResponse.status !== 200) {
+            return networkResponse;
+          }
+
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put('./recipe.html', responseClone).catch(() => {});
+          });
+
+          return networkResponse;
+        })
+        .catch(() => caches.match('./recipe.html'))
+    );
+    return;
+  }
+
+  // Cache-first per il resto del sito pubblico
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
