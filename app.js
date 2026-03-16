@@ -1,3 +1,5 @@
+const DEFAULT_RECIPE_IMAGE = "/images/Chef Lai.png";
+
 const state = { search:"", category:"Tutte", onlyFavs:false, mode:"all", quick:"all", recipes:[] };
 const favKey="ricettario-neil-favorites";
 const noteKey="ricettario-neil-notes";
@@ -38,6 +40,11 @@ function getRecipeKey(r){
 function getRecipePageUrl(recipe){
   if(!recipe?.slug) return "";
   return `/recipe/${encodeURIComponent(recipe.slug)}`;
+}
+
+function getRecipeImage(recipe){
+  const raw = String(recipe?.image_url || recipe?.image || "").trim();
+  return raw || DEFAULT_RECIPE_IMAGE;
 }
 
 function isFav(key){return getFavs().includes(key);}
@@ -226,11 +233,11 @@ function card(r){
   const notes = getNotes();
   const note = notes[recipeKey] || "";
   const fav = isFav(recipeKey);
-  const imageSrc = r.image_url || r.image || "";
+  const imageSrc = getRecipeImage(r);
   const recipeUrl = getRecipePageUrl(r);
 
   return `<article class="card">
-    <img class="cover" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(r.title)}" loading="lazy">
+    <img class="cover" src="${escapeHtml(imageSrc)}" alt="${escapeHtml(r.title)}" loading="lazy" onerror="this.onerror=null;this.src='${escapeHtml(DEFAULT_RECIPE_IMAGE)}';">
     <div class="card-top">
       <div>
         <h3 class="title">
@@ -414,7 +421,7 @@ async function boot() {
 
   state.recipes = recipes.map(r => ({
     ...r,
-    image_url: r.image_url || r.image || "",
+    image_url: getRecipeImage(r),
     slug: r.slug || "",
     _haystack: [
       r.title,
