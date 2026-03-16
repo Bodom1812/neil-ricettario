@@ -1,3 +1,4 @@
+alert("ADMIN JS CARICATO");
 console.log('admin.js v20260316-3 caricato');
 
 let currentSession = null;
