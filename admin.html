@@ -6,113 +6,219 @@
   <title>Admin ricettario Neil</title>
   <link rel="stylesheet" href="admin.css" />
 </head>
+
 <body>
-  <main class="app">
-    <section class="hero">
-      <div class="badge">Area admin</div>
-      <h1>Aggiungi una ricetta</h1>
-      <p>Compila il form, genera il blocco JSON e copialo dentro <code>recipes.json</code>.</p>
-    </section>
 
-    <section class="panel">
-      <div class="grid">
-        <label>
-          <span>Titolo</span>
-          <input id="title" type="text" placeholder="Es. Lasagne della domenica" />
-        </label>
+<main class="app">
 
-        <label>
-          <span>Categoria</span>
-          <select id="category">
-            <option>Dolci</option>
-            <option>Pane e lievitati</option>
-            <option>Primi</option>
-            <option>Secondi</option>
-            <option>Contorni</option>
-            <option>Varie</option>
-          </select>
-        </label>
+<section class="hero">
 
-        <label>
-          <span>Preparazione</span>
-          <input id="prep" type="text" placeholder="Es. 25 min" />
-        </label>
+<div class="badge" id="sessionBadge">Sessione attiva</div>
 
-        <label>
-          <span>Cottura</span>
-          <input id="cook" type="text" placeholder="Es. 35 min" />
-        </label>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px;">
+<p id="sessionInfo" style="margin:0;color:var(--muted);">Controllo sessione...</p>
+<button id="logoutBtn" type="button">Logout</button>
+</div>
 
-        <label>
-          <span>Riposo</span>
-          <input id="rest" type="text" placeholder="Es. 2 h lievitazione" />
-        </label>
+<div class="badge">Area admin</div>
 
-        <label>
-          <span>Totale</span>
-          <input id="total" type="text" placeholder="Es. 1 h" />
-        </label>
+<h1>Aggiungi una ricetta</h1>
 
-        <label>
-          <span>Dosi / Porzioni</span>
-          <input id="servings" type="text" placeholder="Es. 4 persone" />
-        </label>
+<p>Compila il form e salva direttamente nel database Supabase.</p>
 
-        <label>
-          <span>Difficoltà</span>
-          <select id="difficulty">
-            <option>Molto facile</option>
-            <option>Facile</option>
-            <option>Media</option>
-            <option>Difficile</option>
-          </select>
-        </label>
+</section>
 
-        <label class="full">
-          <span>Fonte (link originale)</span>
-          <input id="source" type="url" placeholder="https://..." />
-        </label>
 
-        <label class="full">
-          <span>Percorso immagine</span>
-          <input id="image" type="text" placeholder="images/lasagne-della-domenica.jpg" />
-          <small>Puoi scrivere anche solo il nome file, verrà trasformato in <code>images/...</code>.</small>
-        </label>
 
-        <label class="full">
-          <span>Ingredienti (uno per riga)</span>
-          <textarea id="ingredients" rows="8" placeholder="250 g pasta\n500 g ragù\n500 ml besciamella"></textarea>
-        </label>
+<section class="panel">
 
-        <label class="full">
-          <span>Procedimento (un passaggio per riga)</span>
-          <textarea id="steps" rows="10" placeholder="Prepara il ragù.\nPrepara la besciamella.\nComponi gli strati."></textarea>
-        </label>
-      </div>
+<div class="grid">
 
-      <div class="actions">
-        <button id="generate" class="primary">Genera JSON</button>
-        <button id="copy">Copia JSON</button>
-        <button id="clear">Pulisci</button>
-      </div>
-    </section>
+<label>
+<span>Titolo</span>
+<input id="title" type="text" placeholder="Es. Lasagne della domenica" />
+</label>
 
-    <section class="two-col">
-      <section class="panel">
-        <h2>Anteprima scheda</h2>
-        <article id="preview" class="preview-card empty">
-          Compila il form per vedere l’anteprima.
-        </article>
-      </section>
+<label>
+<span>Categoria</span>
+<select id="category">
+<option>Dolci</option>
+<option>Pane e lievitati</option>
+<option>Primi</option>
+<option>Secondi</option>
+<option>Contorni</option>
+<option>Varie</option>
+</select>
+</label>
 
-      <section class="panel">
-        <h2>Blocco JSON pronto</h2>
-        <textarea id="output" class="output" spellcheck="false" placeholder="Qui comparirà il blocco JSON..."></textarea>
-        <p class="hint">Incollalo dentro <code>recipes.json</code> come nuovo oggetto, separato da una virgola rispetto al precedente.</p>
-      </section>
-    </section>
-  </main>
+<label>
+<span>Preparazione</span>
+<input id="prep" type="text" placeholder="Es. 25 min" />
+</label>
 
-  <script src="admin.js"></script>
+<label>
+<span>Cottura</span>
+<input id="cook" type="text" placeholder="Es. 35 min" />
+</label>
+
+<label>
+<span>Riposo</span>
+<input id="rest" type="text" placeholder="Es. 2 h lievitazione" />
+</label>
+
+<label>
+<span>Totale</span>
+<input id="total" type="text" placeholder="Es. 1 h" />
+</label>
+
+<label>
+<span>Dosi / Porzioni</span>
+<input id="servings" type="text" placeholder="Es. 4 persone" />
+</label>
+
+<label>
+<span>Difficoltà</span>
+<select id="difficulty">
+<option>Molto facile</option>
+<option>Facile</option>
+<option>Media</option>
+<option>Difficile</option>
+</select>
+</label>
+
+<label class="full">
+<span>Fonte (link originale)</span>
+<input id="source" type="url" placeholder="https://..." />
+</label>
+
+
+
+<label class="full">
+<span>Immagine ricetta</span>
+<input id="imageFile" type="file" accept="image/*" />
+<small>Carica un file immagine dal computer. L’upload andrà su Supabase Storage.</small>
+</label>
+
+<label class="full">
+<span>Oppure URL/Percorso immagine manuale</span>
+<input id="image" type="text" placeholder="https://... oppure images/lasagne.jpg" />
+<small>Usa questo campo solo se non vuoi caricare un file.</small>
+</label>
+
+
+
+<label class="full">
+<span>Ingredienti (uno per riga)</span>
+<textarea id="ingredients" rows="8" placeholder="250 g pasta\n500 g ragù\n500 ml besciamella"></textarea>
+</label>
+
+<label class="full">
+<span>Procedimento (un passaggio per riga)</span>
+<textarea id="steps" rows="10" placeholder="Prepara il ragù.\nPrepara la besciamella.\nComponi gli strati."></textarea>
+</label>
+
+</div>
+
+
+
+<div class="actions">
+
+<button id="generate" class="primary" type="button">
+Genera JSON
+</button>
+
+<button id="saveSupabase" type="button">
+Salva su Supabase
+</button>
+
+<button id="copy" type="button">
+Copia JSON
+</button>
+
+<button id="clear" type="button">
+Pulisci
+</button>
+
+</div>
+
+</section>
+
+
+
+<section class="two-col">
+
+<section class="panel">
+
+<h2>Anteprima scheda</h2>
+
+<article id="preview" class="preview-card empty">
+Compila il form per vedere l’anteprima.
+</article>
+
+</section>
+
+
+
+<section class="panel">
+
+<h2>Blocco JSON pronto</h2>
+
+<textarea
+id="output"
+class="output"
+spellcheck="false"
+placeholder="Qui comparirà il blocco JSON..."
+></textarea>
+
+<p class="hint">
+Questo campo è ormai solo informativo perché le ricette vengono salvate direttamente nel database.
+</p>
+
+</section>
+
+</section>
+
+
+
+<!-- SEZIONE NUOVA: DASHBOARD RICETTE -->
+
+<section class="panel">
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+
+<div>
+
+<h2>Ricette salvate</h2>
+
+<p style="margin:6px 0 0;">
+Qui puoi modificare o eliminare le ricette già presenti nel database.
+</p>
+
+</div>
+
+<button id="refreshRecipes" type="button">
+Aggiorna elenco
+</button>
+
+</div>
+
+
+
+<div id="adminRecipesList"
+style="margin-top:16px;display:grid;gap:12px;">
+</div>
+
+</section>
+
+
+
+</main>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="admin.js?v=20260316-4"></script>
+
 </body>
 </html>
