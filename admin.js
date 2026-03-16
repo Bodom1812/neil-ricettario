@@ -238,6 +238,61 @@ function fillFormForEdit(recipe) {
   console.log('Modalità modifica attiva. ID ricetta:', editingRecipeId);
 }
 
+function recipeRowMarkup(recipe) {
+  const imageSrc = recipe.image_url || recipe.image || '';
+  return `
+    <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
+      <img src="${imageSrc}" alt="${recipe.title}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
+      <div style="min-width:0;">
+        <h3 style="margin:0 0 6px;font-size:18px;">${recipe.title}</h3>
+        <div style="font-size:13px;color:var(--muted);line-height:1.5;">
+          <div><strong>Categoria:</strong> ${recipe.category || '-'}</div>
+          <div><strong>Fonte:</strong> ${recipe.source || '-'}</div>
+          <div><strong>Status:</strong> ${recipe.status || '-'}</div>
+        </div>
+      </div>
+      <div style="display:grid;gap:8px;">
+        <button type="button" onclick="editRecipePublic('${recipe.id}')">Modifica</button>
+        <button type="button" onclick="deleteRecipePublic('${recipe.id}', ${JSON.stringify(recipe.title)})">Elimina</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderAdminRecipesList(recipes) {
+  if (!fields.adminRecipesList) return;
+
+  if (!recipes || !recipes.length) {
+    fields.adminRecipesList.innerHTML = '<div class="preview-card empty">Nessuna ricetta presente.</div>';
+    return;
+  }
+
+  fields.adminRecipesList.innerHTML = recipes.map(recipeRowMarkup).join('');
+}
+
+async function loadAdminRecipes() {
+  if (!fields.adminRecipesList) return;
+
+  fields.adminRecipesList.innerHTML = 'Caricamento ricette...';
+
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('recipes')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    window.__adminRecipes = data || [];
+    renderAdminRecipesList(window.__adminRecipes);
+  } catch (err) {
+    console.error(err);
+    fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${err.message}</div>`;
+  }
+}
+
 async function saveToSupabase() {
   const recipe = getRecipeObject();
   const errorMsg = validate(recipe);
@@ -311,6 +366,18 @@ async function saveToSupabase() {
     fields.output.value = JSON.stringify(result.data, null, 2);
     renderPreview(result.data);
 
+    if (!window.__adminRecipes) window.__adminRecipes = [];
+
+    if (editingRecipeId) {
+      window.__adminRecipes = window.__adminRecipes.map(r =>
+        r.id === result.data.id ? result.data : r
+      );
+    } else {
+      window.__adminRecipes.unshift(result.data);
+    }
+
+    renderAdminRecipesList(window.__adminRecipes);
+
     alert(editingRecipeId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
 
     clearForm(false);
@@ -342,61 +409,15 @@ async function deleteRecipe(recipeId, recipeTitle) {
       clearForm();
     }
 
+    if (!window.__adminRecipes) window.__adminRecipes = [];
+    window.__adminRecipes = window.__adminRecipes.filter(r => r.id !== recipeId);
+    renderAdminRecipesList(window.__adminRecipes);
+
     alert('Ricetta eliminata.');
     await loadAdminRecipes();
   } catch (err) {
     console.error(err);
     alert(err.message || 'Errore durante l’eliminazione.');
-  }
-}
-
-function recipeRowMarkup(recipe) {
-  const imageSrc = recipe.image_url || recipe.image || '';
-  return `
-    <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
-      <img src="${imageSrc}" alt="${recipe.title}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
-      <div style="min-width:0;">
-        <h3 style="margin:0 0 6px;font-size:18px;">${recipe.title}</h3>
-        <div style="font-size:13px;color:var(--muted);line-height:1.5;">
-          <div><strong>Categoria:</strong> ${recipe.category || '-'}</div>
-          <div><strong>Fonte:</strong> ${recipe.source || '-'}</div>
-          <div><strong>Status:</strong> ${recipe.status || '-'}</div>
-        </div>
-      </div>
-      <div style="display:grid;gap:8px;">
-        <button type="button" onclick="editRecipePublic('${recipe.id}')">Modifica</button>
-        <button type="button" onclick="deleteRecipePublic('${recipe.id}', ${JSON.stringify(recipe.title)})">Elimina</button>
-      </div>
-    </article>
-  `;
-}
-
-async function loadAdminRecipes() {
-  if (!fields.adminRecipesList) return;
-
-  fields.adminRecipesList.innerHTML = 'Caricamento ricette...';
-
-  try {
-    const { data, error } = await window.supabaseClient
-      .from('recipes')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    window.__adminRecipes = data || [];
-
-    if (!window.__adminRecipes.length) {
-      fields.adminRecipesList.innerHTML = '<div class="preview-card empty">Nessuna ricetta presente.</div>';
-      return;
-    }
-
-    fields.adminRecipesList.innerHTML = window.__adminRecipes.map(recipeRowMarkup).join('');
-  } catch (err) {
-    console.error(err);
-    fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${err.message}</div>`;
   }
 }
 
