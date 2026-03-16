@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Ricetta | Ricettario Neil</title>
   <meta name="description" content="Ricetta del Ricettario Neil" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/styles.css" />
   <style>
     .recipe-page {
       max-width: 900px;
@@ -80,7 +80,7 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase.js"></script>
+  <script src="/supabase.js"></script>
   <script>
     function escapeHtml(value) {
       return String(value ?? '')
@@ -93,16 +93,17 @@
 
     function getSlugFromUrl() {
       const params = new URLSearchParams(window.location.search);
-      const querySlug = (params.get('slug') || '').trim();
+      const slugParam = (params.get('slug') || '').trim();
 
-      if (querySlug) {
-        return querySlug;
+      if (slugParam) {
+        return slugParam;
       }
 
-      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const path = window.location.pathname;
+      const parts = path.split('/').filter(Boolean);
 
-      if (pathParts.length >= 2 && pathParts[0] === 'recipe') {
-        return decodeURIComponent(pathParts[1]).trim();
+      if (parts.length >= 2 && parts[0] === 'recipe') {
+        return decodeURIComponent(parts[1]).trim();
       }
 
       return '';
@@ -116,7 +117,7 @@
         <div class="recipe-not-found">
           <h1>Ricetta non trovata</h1>
           <p>La ricetta richiesta non è disponibile o non è pubblicata.</p>
-          <p><a href="index.html">Torna al ricettario</a></p>
+          <p><a href="/">Torna al ricettario</a></p>
         </div>
       `;
     }
@@ -144,7 +145,7 @@
       updateSeo(recipe);
 
       app.innerHTML = `
-        <a class="back-link" href="index.html">← Torna al ricettario</a>
+        <a class="back-link" href="/">← Torna al ricettario</a>
 
         <article>
           <section class="recipe-hero">
