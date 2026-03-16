@@ -11,10 +11,16 @@ export default async function handler(req, res) {
     const SITE_URL =
       process.env.SITE_URL || "https://neil-ricettario.vercel.app";
 
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_URL) {
       return res
         .status(500)
-        .send(buildErrorPage("Configurazione server incompleta"));
+        .send(buildErrorPage("Manca la variabile SUPABASE_URL"));
+    }
+
+    if (!SUPABASE_ANON_KEY) {
+      return res
+        .status(500)
+        .send(buildErrorPage("Manca la variabile SUPABASE_ANON_KEY"));
     }
 
     const recipe = await fetchRecipeBySlug({
@@ -54,19 +60,28 @@ export default async function handler(req, res) {
     return res.status(200).send(html);
   } catch (error) {
     console.error("recipe-og error:", error);
-    return res
-      .status(500)
-      .send(buildErrorPage("Errore durante il caricamento della ricetta"));
+
+    const message =
+      error && error.message
+        ? `Errore durante il caricamento della ricetta: ${error.message}`
+        : "Errore durante il caricamento della ricetta";
+
+    return res.status(500).send(buildErrorPage(message));
   }
 }
 
 async function fetchRecipeBySlug({ supabaseUrl, supabaseAnonKey, slug }) {
+  const cleanedBaseUrl = String(supabaseUrl).replace(/\/+$/, "");
+  const encodedSlug = encodeURIComponent(slug);
+
   const url =
-    `${supabaseUrl}/rest/v1/recipes` +
+    `${cleanedBaseUrl}/rest/v1/recipes` +
     `?select=id,title,slug,description,image_url,status` +
-    `&slug=eq.${encodeURIComponent(slug)}` +
+    `&slug=eq.${encodedSlug}` +
     `&status=eq.published` +
     `&limit=1`;
+
+  console.log("Fetching recipe from:", url);
 
   const response = await fetch(url, {
     method: "GET",
@@ -77,12 +92,21 @@ async function fetchRecipeBySlug({ supabaseUrl, supabaseAnonKey, slug }) {
     },
   });
 
+  const rawText = await response.text();
+  console.log("Supabase status:", response.status);
+  console.log("Supabase response:", rawText);
+
   if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Supabase REST error ${response.status}: ${body}`);
+    throw new Error(`Supabase REST error ${response.status}: ${rawText}`);
   }
 
-  const data = await response.json();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch (parseError) {
+    throw new Error(`Risposta Supabase non valida: ${rawText}`);
+  }
+
   return Array.isArray(data) && data.length > 0 ? data[0] : null;
 }
 
@@ -127,9 +151,6 @@ function buildRecipePage({
   <meta http-equiv="refresh" content="0; url=${escapedClientUrl}" />
 
   <style>
-    :root {
-      color-scheme: light;
-    }
     body {
       margin: 0;
       font-family: Arial, Helvetica, sans-serif;
@@ -261,9 +282,7 @@ function safeUrl(value, siteUrl) {
   const raw = String(value || "").trim();
 
   if (!raw) return `${siteUrl}/icons/icon-512.png`;
-
   if (/^https?:\/\//i.test(raw)) return raw;
-
   if (raw.startsWith("/")) return `${siteUrl}${raw}`;
 
   return `${siteUrl}/${raw}`;
