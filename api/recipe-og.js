@@ -33,10 +33,8 @@ export default async function handler(req, res) {
       return res.status(404).send(buildNotFoundPage(slug, SITE_URL));
     }
 
-    const title = safeText(recipe.title || "Ricetta | Ricettario Neil");
-    const description = safeText(
-      recipe.description || "Scopri questa ricetta su Ricettario Neil."
-    );
+    const title = safeText(recipe.title || "Ricetta");
+    const description = buildDescription(recipe.title);
     const imageUrl = safeUrl(
       recipe.image_url || `${SITE_URL}/icons/icon-512.png`,
       SITE_URL
@@ -76,7 +74,7 @@ async function fetchRecipeBySlug({ supabaseUrl, supabaseAnonKey, slug }) {
 
   const url =
     `${cleanedBaseUrl}/rest/v1/recipes` +
-    `?select=id,title,slug,description,image_url,status` +
+    `?select=id,title,slug,image_url,status` +
     `&slug=eq.${encodedSlug}` +
     `&status=eq.published` +
     `&limit=1`;
@@ -222,6 +220,11 @@ function buildRecipePage({
   </script>
 </body>
 </html>`;
+}
+
+function buildDescription(title) {
+  const cleanTitle = safeText(title || "questa ricetta");
+  return `Scopri la ricetta ${cleanTitle} su Ricettario Neil.`;
 }
 
 function buildNotFoundPage(slug, siteUrl) {
