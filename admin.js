@@ -71,6 +71,15 @@ const fields = {
   adminRecipesList: $('adminRecipesList')
 };
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function normalizeImagePath(value) {
   const v = (value || '').trim();
   if (!v) return '';
@@ -109,19 +118,18 @@ function validate(recipe) {
   if (!recipe.category) return 'Inserisci la categoria.';
   if (!recipe.ingredients.length) return 'Inserisci almeno un ingrediente.';
   if (!recipe.steps.length) return 'Inserisci almeno un passaggio.';
-  if (!recipe.image_url && !fields.imageFile.files.length && !editingRecipeId) {
+
+  const existingRecipe = editingRecipeId
+    ? (window.__adminRecipes || []).find(r => r.id === editingRecipeId)
+    : null;
+
+  const hasExistingImage = !!(existingRecipe && (existingRecipe.image_url || existingRecipe.image));
+
+  if (!recipe.image_url && !fields.imageFile.files.length && !hasExistingImage) {
     return 'Carica un’immagine oppure inserisci un URL/percorso immagine.';
   }
-  return '';
-}
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return '';
 }
 
 function renderPreview(recipe) {
@@ -250,11 +258,12 @@ function fillFormForEdit(recipe) {
 
 function recipeRowMarkup(recipe) {
   const imageSrc = recipe.image_url || recipe.image || '';
+
   return `
     <article style="display:grid;grid-template-columns:120px 1fr auto;gap:14px;align-items:center;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.05);padding:14px;">
-      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(recipe.title)}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
+      <img src="${escapeHtml(imageSrc)}" alt="${escapeHtml(recipe.title || '')}" style="width:120px;height:80px;object-fit:cover;border-radius:14px;border:1px solid var(--line);background:#131a2d;" onerror="this.style.display='none'">
       <div style="min-width:0;">
-        <h3 style="margin:0 0 6px;font-size:18px;">${escapeHtml(recipe.title)}</h3>
+        <h3 style="margin:0 0 6px;font-size:18px;">${escapeHtml(recipe.title || '')}</h3>
         <div style="font-size:13px;color:var(--muted);line-height:1.5;">
           <div><strong>Categoria:</strong> ${escapeHtml(recipe.category || '-')}</div>
           <div><strong>Fonte:</strong> ${escapeHtml(recipe.source || '-')}</div>
@@ -288,26 +297,6 @@ function renderAdminRecipesList(recipes) {
   fields.adminRecipesList.innerHTML = sortRecipesForAdmin(recipes).map(recipeRowMarkup).join('');
 }
 
-function upsertAdminRecipe(recipe) {
-  const current = Array.isArray(window.__adminRecipes) ? [...window.__adminRecipes] : [];
-  const index = current.findIndex(r => r.id === recipe.id);
-
-  if (index >= 0) {
-    current[index] = recipe;
-  } else {
-    current.unshift(recipe);
-  }
-
-  window.__adminRecipes = sortRecipesForAdmin(current);
-  renderAdminRecipesList(window.__adminRecipes);
-}
-
-function removeAdminRecipe(recipeId) {
-  const current = Array.isArray(window.__adminRecipes) ? window.__adminRecipes : [];
-  window.__adminRecipes = current.filter(r => r.id !== recipeId);
-  renderAdminRecipesList(window.__adminRecipes);
-}
-
 async function loadAdminRecipes() {
   if (!fields.adminRecipesList) return;
 
@@ -325,8 +314,9 @@ async function loadAdminRecipes() {
 
     window.__adminRecipes = Array.isArray(data) ? data : [];
     renderAdminRecipesList(window.__adminRecipes);
+    console.log('Ricette admin caricate:', window.__adminRecipes.length);
   } catch (err) {
-    console.error(err);
+    console.error('Errore loadAdminRecipes:', err);
     fields.adminRecipesList.innerHTML = `<div class="preview-card empty">Errore nel caricamento ricette: ${escapeHtml(err.message)}</div>`;
   }
 }
@@ -405,13 +395,13 @@ async function saveToSupabase() {
 
     console.log('Ricetta salvata/aggiornata:', result.data);
 
-    upsertAdminRecipe(result.data);
+    await loadAdminRecipes();
     clearForm(false);
     fields.output.value = JSON.stringify(result.data, null, 2);
 
     alert(originalEditingId ? 'Ricetta aggiornata con successo.' : 'Ricetta salvata su Supabase con successo.');
   } catch (err) {
-    console.error(err);
+    console.error('Errore saveToSupabase:', err);
     alert(err.message || 'Errore durante il salvataggio.');
   } finally {
     btn.disabled = false;
@@ -420,37 +410,47 @@ async function saveToSupabase() {
 }
 
 async function deleteRecipe(recipeId, recipeTitle) {
+  const session = await requireAuth();
+  if (!session) return;
+
   const confirmDelete = confirm(`Vuoi davvero eliminare la ricetta "${recipeTitle}"?`);
   if (!confirmDelete) return;
 
   try {
-    const { error } = await window.supabaseClient
+    const { data, error } = await window.supabaseClient
       .from('recipes')
       .delete()
-      .eq('id', recipeId);
+      .eq('id', recipeId)
+      .select();
 
     if (error) {
       throw new Error('Eliminazione fallita: ' + error.message);
+    }
+
+    if (!data || !data.length) {
+      throw new Error('Nessuna ricetta eliminata. Controlla la policy DELETE in Supabase.');
     }
 
     if (editingRecipeId === recipeId) {
       clearForm();
     }
 
-    removeAdminRecipe(recipeId);
+    await loadAdminRecipes();
     alert('Ricetta eliminata.');
   } catch (err) {
-    console.error(err);
+    console.error('Errore deleteRecipe:', err);
     alert(err.message || 'Errore durante l’eliminazione.');
   }
 }
 
 function editRecipeById(recipeId) {
   const recipe = (window.__adminRecipes || []).find(r => r.id === recipeId);
+
   if (!recipe) {
     alert('Ricetta non trovata.');
     return;
   }
+
   fillFormForEdit(recipe);
 }
 
@@ -464,10 +464,14 @@ $('copy').addEventListener('click', async () => {
   try {
     await navigator.clipboard.writeText(fields.output.value);
     $('copy').textContent = 'Copiato';
-    setTimeout(() => $('copy').textContent = 'Copia JSON', 1200);
+    setTimeout(() => {
+      $('copy').textContent = 'Copia JSON';
+    }, 1200);
   } catch {
     $('copy').textContent = 'Copia fallita';
-    setTimeout(() => $('copy').textContent = 'Copia JSON', 1200);
+    setTimeout(() => {
+      $('copy').textContent = 'Copia JSON';
+    }, 1200);
   }
 });
 
@@ -480,15 +484,28 @@ if (fields.refreshRecipes) {
 }
 
 [
-  fields.title, fields.category, fields.prep, fields.cook, fields.rest, fields.total,
-  fields.servings, fields.difficulty, fields.source, fields.image, fields.ingredients, fields.steps
+  fields.title,
+  fields.category,
+  fields.prep,
+  fields.cook,
+  fields.rest,
+  fields.total,
+  fields.servings,
+  fields.difficulty,
+  fields.source,
+  fields.image,
+  fields.ingredients,
+  fields.steps
 ].forEach(el => {
-  if (el) el.addEventListener('input', generate);
+  if (el) {
+    el.addEventListener('input', generate);
+  }
 });
 
 if (fields.imageFile) {
   fields.imageFile.addEventListener('change', () => {
     const file = fields.imageFile.files[0];
+
     if (file) {
       fields.image.value = '';
       fields.preview.classList.remove('empty');
